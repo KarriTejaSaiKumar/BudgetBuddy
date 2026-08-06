@@ -26,7 +26,8 @@ import {
   AlertCircle,
   DollarSign,
   Calendar,
-  Layers
+  Layers,
+  Eye
 } from 'lucide-react';
 
 const Income = () => {
@@ -41,6 +42,7 @@ const Income = () => {
   const [formData, setFormData] = useState({ title: '', amount: '', currency: currency, source: 'salary', income_date: '', description: '' });
   const [editingId, setEditingId] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [viewRecord, setViewRecord] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
   const [error, setError] = useState('');
 
@@ -154,8 +156,8 @@ const Income = () => {
     <AppLayout title="Income">
       {/* 1. Page Header */}
       <PageHeader
-        title="Income Telemetry"
-        subtitle="Manage and monitor your incoming income streams and revenue sources."
+        title="Income"
+        subtitle="Manage and monitor your income sources."
         icon={TrendingUp}
         actions={
           <PrimaryButton onClick={handleOpenAddModal} icon={Plus}>
@@ -298,11 +300,20 @@ const Income = () => {
                     +{formatCurrency(inc.amount, inc.currency || currency, numberFormat)}
                   </td>
                   <td className="py-3.5 px-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
+                    <div className="flex items-center justify-end gap-1.5">
+                      <button
+                        onClick={() => setViewRecord(inc)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-blue-500 hover:bg-blue-500/10 transition cursor-pointer"
+                        title="View Income Details"
+                        aria-label="View Income Details"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
                       <button
                         onClick={() => handleOpenEditModal(inc)}
                         className="p-1.5 rounded-lg text-slate-400 hover:text-orange-500 hover:bg-orange-500/10 transition cursor-pointer"
                         title="Edit Income Record"
+                        aria-label="Edit Income Record"
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
@@ -310,6 +321,7 @@ const Income = () => {
                         onClick={() => setDeleteId(inc.id)}
                         className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition cursor-pointer"
                         title="Delete Income Record"
+                        aria-label="Delete Income Record"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -433,7 +445,55 @@ const Income = () => {
         </form>
       </Modal>
 
-      {/* 6. Delete Confirmation Dialog */}
+      {/* 6. View Income Details Modal */}
+      <Modal
+        isOpen={Boolean(viewRecord)}
+        onClose={() => setViewRecord(null)}
+        title="Income Record Details"
+        maxWidth="max-w-md"
+      >
+        {viewRecord && (
+          <div className="space-y-4">
+            <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">
+              <div className="text-xs font-semibold text-emerald-500 uppercase tracking-wider mb-1">Income Amount</div>
+              <div className="text-2xl font-extrabold text-emerald-500">
+                +{formatCurrency(viewRecord.amount, viewRecord.currency || currency, numberFormat)}
+              </div>
+            </div>
+
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between py-2 border-b border-slate-100 dark:border-slate-800">
+                <span className="text-slate-500 dark:text-slate-400 font-medium">Title</span>
+                <span className="font-semibold text-slate-900 dark:text-slate-100">{viewRecord.title}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-slate-100 dark:border-slate-800">
+                <span className="text-slate-500 dark:text-slate-400 font-medium">Source</span>
+                <StatusBadge type="income">
+                  {viewRecord.source_display || viewRecord.source}
+                </StatusBadge>
+              </div>
+              <div className="flex justify-between py-2 border-b border-slate-100 dark:border-slate-800">
+                <span className="text-slate-500 dark:text-slate-400 font-medium">Income Date</span>
+                <span className="font-semibold text-slate-900 dark:text-slate-100">{formatDate(viewRecord.income_date, dateFormat)}</span>
+              </div>
+              {viewRecord.description && (
+                <div className="py-2">
+                  <span className="block text-slate-500 dark:text-slate-400 font-medium mb-1">Description</span>
+                  <p className="p-3 rounded-xl bg-slate-100 dark:bg-slate-950 text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+                    {viewRecord.description}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end pt-3 border-t border-slate-100 dark:border-slate-800">
+              <SecondaryButton onClick={() => setViewRecord(null)}>Close</SecondaryButton>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* 7. Delete Confirmation Dialog */}
       <ConfirmationDialog
         isOpen={Boolean(deleteId)}
         onClose={() => setDeleteId(null)}

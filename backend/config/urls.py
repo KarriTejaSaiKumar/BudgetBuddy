@@ -31,6 +31,18 @@ urlpatterns = [
     # Budgets API endpoints
     path('api/budgets/', include('budgets.urls')),
     
+    # Savings API endpoints
+    path('api/savings/', include('savings.urls')),
+    
+    # Notifications API endpoints
+    path('api/notifications/', include('notifications.urls')),
+    
+    # Analytics API endpoints
+    path('api/analytics/', include('analytics.urls')),
+    
+    # Reports API endpoints
+    path('api/reports/', include('reports.urls')),
+    
     # SimpleJWT Authentication endpoints (Login, Refresh)
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
