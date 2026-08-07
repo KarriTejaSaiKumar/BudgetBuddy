@@ -82,3 +82,58 @@ class AuthTests(APITestCase):
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {access_token}')
         response = self.client.post(self.logout_url, {"refresh": refresh_token}, format='json')
         self.assertEqual(response.status_code, status.HTTP_205_RESET_CONTENT)
+
+
+class UserPreferencesAPITests(APITestCase):
+    def setUp(self):
+        self.user1 = User.objects.create_user(username='pref_user1', email='pref1@example.com', password='password123')
+        self.user2 = User.objects.create_user(username='pref_user2', email='pref2@example.com', password='password123')
+
+    def test_get_user_preferences_default(self):
+        self.client.force_authenticate(user=self.user1)
+        res = self.client.get('/api/profile/preferences/')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data['preferred_currency'], 'INR')
+        self.assertEqual(res.data['theme_preference'], 'system')
+        self.assertEqual(res.data['language'], 'English')
+        self.assertEqual(res.data['timezone'], 'Asia/Kolkata')
+        self.assertTrue(res.data['email_notifications'])
+
+    def test_update_user_preferences_success(self):
+        self.client.force_authenticate(user=self.user1)
+        data = {
+            "preferred_currency": "USD",
+            "theme_preference": "dark",
+            "email_notifications": False,
+            "language": "French",
+            "timezone": "Europe/Paris"
+        }
+        res = self.client.patch('/api/profile/preferences/', data)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data['preferred_currency'], 'USD')
+        self.assertEqual(res.data['theme_preference'], 'dark')
+        self.assertFalse(res.data['email_notifications'])
+        self.assertEqual(res.data['language'], 'French')
+        self.assertEqual(res.data['timezone'], 'Europe/Paris')
+
+    def test_invalid_currency_validation(self):
+        self.client.force_authenticate(user=self.user1)
+        res = self.client.patch('/api/profile/preferences/', {"preferred_currency": "XYZ"})
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('preferred_currency', res.data)
+
+    def test_invalid_theme_validation(self):
+        self.client.force_authenticate(user=self.user1)
+        res = self.client.patch('/api/profile/preferences/', {"theme_preference": "neon"})
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('theme_preference', res.data)
+
+    def test_user_preferences_isolation(self):
+        self.client.force_authenticate(user=self.user1)
+        self.client.patch('/api/profile/preferences/', {"theme_preference": "dark"})
+
+        self.client.force_authenticate(user=self.user2)
+        res = self.client.get('/api/profile/preferences/')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data['theme_preference'], 'system')
+

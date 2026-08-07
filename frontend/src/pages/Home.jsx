@@ -1,57 +1,34 @@
 import React from 'react';
-import { useTheme } from '../context/ThemeContext';
+import LandingBackground from '../components/landing/LandingBackground';
 import Navbar from '../components/landing/Navbar';
 import HeroSection from '../components/landing/HeroSection';
+import TrustSection from '../components/landing/TrustSection';
 import FeaturesSection from '../components/landing/FeaturesSection';
-import BenefitsSection from '../components/landing/BenefitsSection';
-import HowItWorksSection from '../components/landing/HowItWorksSection';
-import DashboardPreviewSection from '../components/landing/DashboardPreviewSection';
-import TestimonialsSection from '../components/landing/TestimonialsSection';
-import PricingSection from '../components/landing/PricingSection';
-import FaqSection from '../components/landing/FaqSection';
+import ShowcaseSection from '../components/landing/ShowcaseSection';
+import FlowSection from '../components/landing/FlowSection';
+import AnalyticsSection from '../components/landing/AnalyticsSection';
+import NotificationsSection from '../components/landing/NotificationsSection';
+import CtaSection from '../components/landing/CtaSection';
 import Footer from '../components/landing/Footer';
 
-const Home = () => {
-  const { isDark } = useTheme();
+const Home = () => (
+  <div className="relative min-h-screen overflow-x-clip text-foreground">
+    <LandingBackground />
+    <Navbar />
 
-  return (
-    <div className={`min-h-screen flex flex-col justify-between transition-colors duration-300 selection:bg-orange-500 selection:text-white ${
-      isDark ? 'bg-[#0B0B0B] text-slate-100' : 'bg-white text-slate-900'
-    }`}>
-      {/* 1. Header Navigation */}
-      <Navbar />
+    <main>
+      <HeroSection />
+      <TrustSection />
+      <FeaturesSection />
+      <ShowcaseSection />
+      <FlowSection />
+      <AnalyticsSection />
+      <NotificationsSection />
+      <CtaSection />
+    </main>
 
-      {/* Main Landing Sections */}
-      <main className="flex-1">
-        {/* 2. Hero Section */}
-        <HeroSection />
-
-        {/* 3. Features Section */}
-        <FeaturesSection />
-
-        {/* 4. Benefits Section */}
-        <BenefitsSection />
-
-        {/* 5. How It Works Timeline */}
-        <HowItWorksSection />
-
-        {/* 6. Dashboard Preview Cockpit */}
-        <DashboardPreviewSection />
-
-        {/* 7. Testimonials */}
-        <TestimonialsSection />
-
-        {/* 8. Pricing Section */}
-        <PricingSection />
-
-        {/* 9. FAQ Section */}
-        <FaqSection />
-      </main>
-
-      {/* 10. Footer */}
-      <Footer />
-    </div>
-  );
-};
+    <Footer />
+  </div>
+);
 
 export default Home;

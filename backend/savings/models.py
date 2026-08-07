@@ -9,6 +9,8 @@ class SavingsGoal(models.Model):
     target_amount = models.DecimalField(max_digits=12, decimal_places=2)
     current_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     deadline = models.DateField()
+    notes = models.TextField(blank=True, default='')
+    is_completed = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -17,5 +19,14 @@ class SavingsGoal(models.Model):
         verbose_name = "Savings Goal"
         verbose_name_plural = "Savings Goals"
 
+    def save(self, *args, **kwargs):
+        if self.current_amount is not None and self.target_amount is not None:
+            if self.current_amount >= self.target_amount:
+                self.is_completed = True
+            else:
+                self.is_completed = False
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.user.username} - {self.goal_name}: {self.current_amount}/{self.target_amount}"
+

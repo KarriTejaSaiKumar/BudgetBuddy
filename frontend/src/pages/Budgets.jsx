@@ -1,593 +1,365 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Gauge, PiggyBank, Plus, Target, Wallet } from 'lucide-react';
 import AppLayout from '../layouts/AppLayout';
-import {
-  PageHeader,
-  DashboardCard,
-  TableContainer,
-  StatusBadge,
-  PrimaryButton,
-  SecondaryButton,
-  Modal,
-  ConfirmationDialog,
-  EmptyState,
-  LoadingSkeleton
-} from '../components';
 import api from '../services/api';
 import { useFinancialPreferences } from '../context/FinancialPreferencesContext';
-import { formatCurrency, SUPPORTED_CURRENCIES } from '../utils/formatters';
+import { formatCurrency } from '../utils/formatters';
 import {
-  PieChart,
-  Plus,
-  Edit2,
-  Trash2,
-  AlertCircle,
-  AlertTriangle,
-  CheckCircle2,
-  Calendar,
-  Grid,
-  List,
-  Eye,
-  TrendingUp
-} from 'lucide-react';
+  BUDGET_CATEGORIES,
+  decorateBudget,
+} from '../utils/budgets';
+import BudgetCard from '../components/budgets/BudgetCard';
+import BudgetFormDialog from '../components/budgets/BudgetFormDialog';
+import {
+  Button,
+  Card,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  EmptyState,
+  PageHeader,
+  SearchInput,
+  Select,
+  Skeleton,
+  StatCard,
+} from '@/components/ui';
+
+const STATUSES = [
+  { value: 'all', label: 'All statuses' },
+  { value: 'ok', label: 'On track' },
+  { value: 'near', label: 'Near limit' },
+  { value: 'over', label: 'Over budget' },
+];
+
+const SORTS = [
+  { value: 'usage', label: 'Most used first' },
+  { value: 'largest', label: 'Largest budget' },
+  { value: 'remaining', label: 'Least remaining' },
+  { value: 'name', label: 'Name A–Z' },
+];
 
 const Budgets = () => {
   const { currency, dateFormat, numberFormat } = useFinancialPreferences();
+
   const [budgets, setBudgets] = useState([]);
-  const [summaries, setSummaries] = useState({});
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'table'
 
-  // Modal & Form States
-  const [formData, setFormData] = useState({
-    category: 'food',
-    budget_amount: '',
-    currency: currency,
-    month: new Date().getMonth() + 1,
-    year: new Date().getFullYear()
-  });
-  const [editingId, setEditingId] = useState(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [deleteId, setDeleteId] = useState(null);
-  const [selectedSummary, setSelectedSummary] = useState(null);
-  const [error, setError] = useState('');
+  const [query, setQuery] = useState('');
+  const [category, setCategory] = useState('all');
+  const [status, setStatus] = useState('all');
+  const [sort, setSort] = useState('usage');
 
-  const monthNames = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"
-  ];
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [deleting, setDeleting] = useState(null);
 
-  useEffect(() => {
-    fetchBudgets();
-  }, []);
-
+  // One request: the list serializer already returns spend, remaining and status.
   const fetchBudgets = async () => {
     setLoading(true);
     try {
-      const response = await api.get('/budgets/');
-      setBudgets(response.data);
-      response.data.forEach((b) => fetchSingleSummary(b.id));
+      const { data } = await api.get('/budgets/');
+      const list = Array.isArray(data) ? data : [];
+      setBudgets(list.map((b) => decorateBudget(b)));
     } catch (err) {
-      console.error('Error fetching budget records:', err);
+      console.error('Error fetching budgets:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchSingleSummary = async (id) => {
-    try {
-      const response = await api.get(`/budgets/${id}/summary/`);
-      setSummaries((prev) => ({ ...prev, [id]: response.data }));
-    } catch (err) {
-      console.error(`Error fetching summary for budget ${id}:`, err);
-    }
-  };
+  useEffect(() => {
+    fetchBudgets();
+  }, []);
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const handleOpenAddModal = () => {
-    setEditingId(null);
-    setFormData({
-      category: 'food',
-      budget_amount: '',
-      currency: currency,
-      month: new Date().getMonth() + 1,
-      year: new Date().getFullYear()
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const filtered = budgets.filter((b) => {
+      if (category !== 'all' && b.category !== category) return false;
+      if (status !== 'all' && b.status.key !== status) return false;
+      if (!q) return true;
+      return b.name.toLowerCase().includes(q) || b.category.toLowerCase().includes(q);
     });
-    setError('');
-    setIsModalOpen(true);
-  };
 
-  const handleOpenEditModal = (bud) => {
-    setEditingId(bud.id);
-    setFormData({
-      category: bud.category,
-      budget_amount: bud.budget_amount,
-      currency: bud.currency || currency,
-      month: bud.month,
-      year: bud.year
-    });
-    setError('');
-    setIsModalOpen(true);
-  };
-
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setEditingId(null);
-    setError('');
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    try {
-      if (editingId) {
-        await api.put(`/budgets/${editingId}/update/`, formData);
-      } else {
-        await api.post('/budgets/create/', formData);
+    const sorted = [...filtered];
+    sorted.sort((a, b) => {
+      switch (sort) {
+        case 'largest':
+          return b.limit - a.limit;
+        case 'remaining':
+          return a.remaining - b.remaining;
+        case 'name':
+          return a.name.localeCompare(b.name);
+        default:
+          return b.status.pct - a.status.pct;
       }
-      handleCloseModal();
-      fetchBudgets();
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to save category budget.');
-      console.error(err);
-    }
+    });
+    return sorted;
+  }, [budgets, query, category, status, sort]);
+
+  const stats = useMemo(() => {
+    const total = visible.reduce((sum, b) => sum + b.limit, 0);
+    const spent = visible.reduce((sum, b) => sum + b.spent, 0);
+    return {
+      total,
+      spent,
+      remaining: Math.max(total - spent, 0),
+      utilization: total > 0 ? Math.round((spent / total) * 100) : 0,
+    };
+  }, [visible]);
+
+  const openAdd = () => {
+    setEditing(null);
+    setFormError('');
+    setDialogOpen(true);
   };
 
-  const handleConfirmDelete = async () => {
-    if (!deleteId) return;
+  const openEdit = (budget) => {
+    setEditing(budget);
+    setFormError('');
+    setDialogOpen(true);
+  };
+
+  const handleSubmit = async (payload) => {
+    setSubmitting(true);
+    setFormError('');
     try {
-      await api.delete(`/budgets/${deleteId}/delete/`);
-      setDeleteId(null);
-      fetchBudgets();
+      if (editing) {
+        await api.put(`/budgets/${editing.id}/update/`, payload);
+      } else {
+        await api.post('/budgets/create/', payload);
+      }
+      setDialogOpen(false);
+      setEditing(null);
+      await fetchBudgets();
     } catch (err) {
-      console.error('Error deleting category budget:', err);
+      const detail = err.response?.data;
+      setFormError(
+        typeof detail === 'string'
+          ? detail
+          : detail?.error ||
+              detail?.detail ||
+              Object.values(detail || {}).flat()[0] ||
+              'Could not save this budget.',
+      );
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  // Metrics
-  const totalAllocated = budgets.reduce((sum, b) => sum + parseFloat(b.budget_amount || 0), 0);
-  const totalSpent = Object.values(summaries).reduce((sum, s) => sum + (s.total_expense || 0), 0);
-  const totalRemaining = totalAllocated - totalSpent;
-  const overspentCount = Object.values(summaries).filter((s) => s.overspent_amount > 0).length;
+  const handleDelete = async () => {
+    if (!deleting) return;
+    try {
+      await api.delete(`/budgets/${deleting.id}/delete/`);
+      setBudgets((prev) => prev.filter((b) => b.id !== deleting.id));
+    } catch (err) {
+      console.error('Error deleting budget:', err);
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  const filtersActive = query || category !== 'all' || status !== 'all';
+  const clearFilters = () => {
+    setQuery('');
+    setCategory('all');
+    setStatus('all');
+  };
 
   return (
     <AppLayout title="Budgets">
-      {/* 1. Page Header */}
       <PageHeader
-        title="Category Budget Limits"
-        subtitle="Set category spending thresholds and monitor real-time utilization."
-        icon={PieChart}
+        eyebrow="Guardrails"
+        title="Budgets"
+        description="Set a ceiling per category, then watch it fill up calmly."
         actions={
-          <>
-            <div className="flex items-center bg-slate-100 dark:bg-slate-950 p-1 rounded-xl border border-slate-200 dark:border-slate-800">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition ${
-                  viewMode === 'grid'
-                    ? 'bg-white dark:bg-slate-900 text-orange-500 shadow-xs'
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                }`}
-                title="Grid View"
-              >
-                <Grid className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setViewMode('table')}
-                className={`p-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition ${
-                  viewMode === 'table'
-                    ? 'bg-white dark:bg-slate-900 text-orange-500 shadow-xs'
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                }`}
-                title="Table View"
-              >
-                <List className="w-4 h-4" />
-              </button>
-            </div>
-
-            <PrimaryButton onClick={handleOpenAddModal} icon={Plus}>
-              Set Budget
-            </PrimaryButton>
-          </>
+          <Button onClick={openAdd}>
+            <Plus /> Create budget
+          </Button>
         }
       />
 
-      {/* 2. Summary Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <DashboardCard
-          title="Total Budget Allocated"
-          amount={totalAllocated}
-          currency={currency}
-          icon={PieChart}
-          iconBg="bg-orange-500/10 text-orange-500 border-orange-500/20"
-          subtitle="Cumulative monthly limit"
-          subtitleColor="text-orange-500"
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Total budget"
+          value={formatCurrency(stats.total, currency, numberFormat)}
+          icon={Target}
+          tone="primary"
+          hint={`${visible.length} ${visible.length === 1 ? 'budget' : 'budgets'}`}
+          loading={loading}
         />
-
-        <DashboardCard
-          title="Total Spent So Far"
-          amount={totalSpent}
-          currency={currency}
-          icon={TrendingUp}
-          iconBg="bg-rose-500/10 text-rose-500 border-rose-500/20"
-          subtitle="Total recorded expenses"
-          subtitleColor="text-rose-500"
+        <StatCard
+          label="Total spent"
+          value={formatCurrency(stats.spent, currency, numberFormat)}
+          icon={Wallet}
+          tone="destructive"
+          hint="Matched from your expenses"
+          loading={loading}
         />
-
-        <DashboardCard
-          title="Net Remaining Capacity"
-          amount={totalRemaining}
-          currency={currency}
-          icon={CheckCircle2}
-          iconBg="bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
-          subtitle="Capacity left before limit"
-          subtitleColor="text-emerald-500"
+        <StatCard
+          label="Remaining"
+          value={formatCurrency(stats.remaining, currency, numberFormat)}
+          icon={PiggyBank}
+          tone="success"
+          hint="Still safe to spend"
+          loading={loading}
         />
-
-        <DashboardCard
-          title="Overspent Categories"
-          amount={overspentCount}
-          currency={currency}
-          icon={AlertTriangle}
-          iconBg="bg-amber-500/10 text-amber-500 border-amber-500/20"
-          subtitle={`${overspentCount} categories exceeded`}
-          subtitleColor={overspentCount > 0 ? "text-rose-500" : "text-emerald-500"}
+        <StatCard
+          label="Utilisation"
+          value={`${stats.utilization}%`}
+          icon={Gauge}
+          tone={stats.utilization >= 100 ? 'destructive' : stats.utilization >= 80 ? 'warning' : 'info'}
+          progress={Math.min(stats.utilization, 100)}
+          hint={stats.utilization >= 100 ? 'Over your combined limit' : 'Of your combined limit'}
+          loading={loading}
         />
       </div>
 
-      {/* 3. Main View Grid or Table */}
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        Spend attribution follows the server&rsquo;s own category matching. Budget and expense
+        categories use separate vocabularies, so an expense in a similarly named category may not
+        count toward a budget here.
+      </p>
+
+      {/* Controls */}
+      <Card className="flex flex-col gap-3 p-3 lg:flex-row lg:items-center">
+        <SearchInput
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onClear={() => setQuery('')}
+          placeholder="Search budgets by name or category…"
+          className="lg:max-w-sm lg:flex-1"
+        />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:ml-auto lg:w-auto">
+          <Select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            aria-label="Filter by category"
+            className="sm:w-44"
+          >
+            <option value="all">All categories</option>
+            {BUDGET_CATEGORIES.map((c) => (
+              <option key={c.value} value={c.value}>
+                {c.label}
+              </option>
+            ))}
+          </Select>
+          <Select
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            aria-label="Filter by status"
+            className="sm:w-40"
+          >
+            {STATUSES.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
+          </Select>
+          <Select value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort budgets" className="sm:w-44">
+            {SORTS.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
+          </Select>
+        </div>
+      </Card>
+
       {loading ? (
-        <LoadingSkeleton count={4} type="card" />
-      ) : budgets.length === 0 ? (
-        <TableContainer>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {[0, 1, 2].map((i) => (
+            <Card key={i} className="space-y-4 p-5">
+              <Skeleton className="h-9 w-9 rounded-xl" />
+              <Skeleton className="h-6 w-32" />
+              <Skeleton className="h-1.5 w-full" />
+              <Skeleton className="h-3 w-40" />
+            </Card>
+          ))}
+        </div>
+      ) : visible.length === 0 ? (
+        <Card>
           <EmptyState
-            title="No active category budgets"
-            description="Establish monthly spending thresholds for housing, food, utilities, and transport to prevent overspending."
+            icon={Target}
+            title={filtersActive ? 'No budgets match those filters' : 'No budgets yet'}
+            description={
+              filtersActive
+                ? 'Try another category or status.'
+                : 'Set a limit for the category you overspend on most — start with one.'
+            }
             action={
-              <PrimaryButton onClick={handleOpenAddModal} icon={Plus}>
-                Set First Category Budget
-              </PrimaryButton>
+              filtersActive ? (
+                <Button variant="secondary" onClick={clearFilters}>
+                  Clear filters
+                </Button>
+              ) : (
+                <Button onClick={openAdd}>
+                  <Plus /> Create budget
+                </Button>
+              )
             }
           />
-        </TableContainer>
-      ) : viewMode === 'grid' ? (
-        /* Grid Card View */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {budgets.map((bud) => {
-            const bSummary = summaries[bud.id];
-            const spent = bSummary ? bSummary.total_expense : 0;
-            const limit = parseFloat(bud.budget_amount || 0);
-            const percentage = limit > 0 ? Math.min(100, Math.round((spent / limit) * 100)) : 0;
-            const isOverspent = bSummary && bSummary.overspent_amount > 0;
-            const itemCurrency = bud.currency || currency;
-
-            return (
-              <div
-                key={bud.id}
-                className="p-6 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800/80 shadow-xs hover:border-orange-500/40 transition-all flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h3 className="text-base font-bold text-slate-900 dark:text-white capitalize">
-                        {bud.category_display || bud.category}
-                      </h3>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mt-0.5">
-                        <Calendar className="w-3.5 h-3.5 text-orange-500" />
-                        <span>{monthNames[bud.month - 1]} {bud.year}</span>
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => setSelectedSummary(bSummary || { budget: bud })}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-orange-500 hover:bg-orange-500/10 transition cursor-pointer"
-                        title="View Detailed Summary"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleOpenEditModal(bud)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-orange-500 hover:bg-orange-500/10 transition cursor-pointer"
-                        title="Edit Budget"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => setDeleteId(bud.id)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition cursor-pointer"
-                        title="Delete Budget"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Progress Ring / Bar */}
-                  <div className="space-y-2 mb-4">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-500 dark:text-slate-400">Spending Progress</span>
-                      <span className="font-bold text-slate-900 dark:text-white">{percentage}%</span>
-                    </div>
-
-                    <div className="w-full bg-slate-100 dark:bg-slate-950 rounded-full h-2.5 overflow-hidden border border-slate-200 dark:border-slate-800">
-                      <div
-                        className={`h-2.5 rounded-full transition-all duration-500 ${
-                          isOverspent
-                            ? 'bg-rose-500'
-                            : percentage >= 70
-                            ? 'bg-amber-500'
-                            : 'bg-emerald-500'
-                        }`}
-                        style={{ width: `${percentage}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800/90 text-xs">
-                    <div>
-                      <span className="text-slate-400 block text-[10px] uppercase">Spent</span>
-                      <span className="font-bold text-rose-500">
-                        {formatCurrency(spent, itemCurrency, numberFormat)}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block text-[10px] uppercase">Limit</span>
-                      <span className="font-bold text-slate-900 dark:text-white">
-                        {formatCurrency(limit, itemCurrency, numberFormat)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
-                  {isOverspent ? (
-                    <StatusBadge type="expense" icon={AlertTriangle}>
-                      Overspent by {formatCurrency(bSummary.overspent_amount, itemCurrency, numberFormat)}
-                    </StatusBadge>
-                  ) : (
-                    <StatusBadge type="income" icon={CheckCircle2}>
-                      {formatCurrency(bSummary ? bSummary.remaining_budget : 0, itemCurrency, numberFormat)} Remaining
-                    </StatusBadge>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        </Card>
       ) : (
-        /* Table View */
-        <TableContainer>
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                <th className="py-3 px-4">Category</th>
-                <th className="py-3 px-4">Period</th>
-                <th className="py-3 px-4">Limit</th>
-                <th className="py-3 px-4">Spent</th>
-                <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-              {budgets.map((bud) => {
-                const bSummary = summaries[bud.id];
-                const spent = bSummary ? bSummary.total_expense : 0;
-                const limit = parseFloat(bud.budget_amount || 0);
-                const isOverspent = bSummary && bSummary.overspent_amount > 0;
-                const itemCurrency = bud.currency || currency;
-
-                return (
-                  <tr key={bud.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition">
-                    <td className="py-3.5 px-4 font-semibold text-slate-900 dark:text-slate-100 capitalize">
-                      {bud.category_display || bud.category}
-                    </td>
-                    <td className="py-3.5 px-4 text-xs text-slate-500 dark:text-slate-400">
-                      {monthNames[bud.month - 1]} {bud.year}
-                    </td>
-                    <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
-                      {formatCurrency(limit, itemCurrency, numberFormat)}
-                    </td>
-                    <td className="py-3.5 px-4 font-bold text-rose-500">
-                      {formatCurrency(spent, itemCurrency, numberFormat)}
-                    </td>
-                    <td className="py-3.5 px-4">
-                      {isOverspent ? (
-                        <StatusBadge type="expense" icon={AlertTriangle}>
-                          Overspent
-                        </StatusBadge>
-                      ) : (
-                        <StatusBadge type="income" icon={CheckCircle2}>
-                          On Track
-                        </StatusBadge>
-                      )}
-                    </td>
-                    <td className="py-3.5 px-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => setSelectedSummary(bSummary || { budget: bud })}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-orange-500 hover:bg-orange-500/10 transition cursor-pointer"
-                          title="View Summary"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleOpenEditModal(bud)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-orange-500 hover:bg-orange-500/10 transition cursor-pointer"
-                          title="Edit Budget"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => setDeleteId(bud.id)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition cursor-pointer"
-                          title="Delete Budget"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </TableContainer>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {visible.map((budget) => (
+            <BudgetCard
+              key={budget.id}
+              budget={budget}
+              currency={currency}
+              dateFormat={dateFormat}
+              numberFormat={numberFormat}
+              onEdit={openEdit}
+              onDelete={setDeleting}
+            />
+          ))}
+        </div>
       )}
 
-      {/* 4. Edit / Add Budget Modal Dialog */}
-      <Modal
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        title={editingId ? 'Edit Category Budget' : 'Set Category Budget'}
-        maxWidth="max-w-md"
+      {/* Mobile quick action */}
+      <button
+        onClick={openAdd}
+        aria-label="Create budget"
+        className="fixed bottom-6 right-5 z-30 grid size-14 place-items-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] active:translate-y-px sm:hidden"
       >
-        {error && (
-          <div className="mb-4 p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-500 text-xs flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
+        <Plus className="size-5" />
+      </button>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Category *</label>
-            <select
-              name="category"
-              value={formData.category}
-              onChange={handleChange}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-orange-500"
-            >
-              <option value="housing">Housing/Rent</option>
-              <option value="food">Food</option>
-              <option value="groceries">Groceries</option>
-              <option value="utilities">Utilities</option>
-              <option value="transport">Transport</option>
-              <option value="entertainment">Entertainment</option>
-              <option value="insurance">Insurance/Healthcare</option>
-              <option value="other">Other</option>
-            </select>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="sm:col-span-2">
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Limit Amount *</label>
-              <input
-                type="number"
-                step="0.01"
-                name="budget_amount"
-                placeholder="500.00"
-                value={formData.budget_amount}
-                onChange={handleChange}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-orange-500"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Currency</label>
-              <select
-                name="currency"
-                value={formData.currency}
-                onChange={handleChange}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-orange-500"
-              >
-                {SUPPORTED_CURRENCIES.map((c) => (
-                  <option key={c.code} value={c.code}>
-                    {c.code} ({c.symbol})
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Month *</label>
-              <select
-                name="month"
-                value={formData.month}
-                onChange={handleChange}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-orange-500"
-              >
-                {monthNames.map((m, idx) => (
-                  <option key={idx + 1} value={idx + 1}>
-                    {m}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Year *</label>
-              <input
-                type="number"
-                name="year"
-                value={formData.year}
-                onChange={handleChange}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-orange-500"
-                required
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
-            <SecondaryButton onClick={handleCloseModal}>Cancel</SecondaryButton>
-            <PrimaryButton type="submit">
-              {editingId ? 'Update Budget' : 'Save Budget'}
-            </PrimaryButton>
-          </div>
-        </form>
-      </Modal>
-
-      {/* 5. Detailed Summary Modal Dialog */}
-      <Modal
-        isOpen={Boolean(selectedSummary)}
-        onClose={() => setSelectedSummary(null)}
-        title="Category Budget Telemetry"
-        maxWidth="max-w-md"
-      >
-        {selectedSummary && (
-          <div className="space-y-4 text-xs">
-            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800/90 space-y-2">
-              <div className="flex justify-between">
-                <span className="text-slate-400">Total Budget Limit:</span>
-                <span className="font-bold text-slate-900 dark:text-white">
-                  {formatCurrency(selectedSummary.budget_amount || selectedSummary.budget?.budget_amount || 0, selectedSummary.budget?.currency || currency, numberFormat)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Total Expenses Logged:</span>
-                <span className="font-bold text-rose-500">
-                  {formatCurrency(selectedSummary.total_expense || 0, selectedSummary.budget?.currency || currency, numberFormat)}
-                </span>
-              </div>
-              <div className="flex justify-between border-t border-slate-200 dark:border-slate-800 pt-2 font-bold">
-                <span className="text-slate-400">Remaining Budget:</span>
-                <span className="text-emerald-500">
-                  {formatCurrency(selectedSummary.remaining_budget || 0, selectedSummary.budget?.currency || currency, numberFormat)}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex justify-end">
-              <SecondaryButton onClick={() => setSelectedSummary(null)}>Close</SecondaryButton>
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      {/* 6. Delete Confirmation Dialog */}
-      <ConfirmationDialog
-        isOpen={Boolean(deleteId)}
-        onClose={() => setDeleteId(null)}
-        onConfirm={handleConfirmDelete}
-        title="Delete Category Budget"
-        message="Are you sure you want to delete this category budget limit? This action cannot be reversed."
-        confirmText="Delete Budget"
-        isDanger={true}
+      <BudgetFormDialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) setEditing(null);
+        }}
+        onSubmit={handleSubmit}
+        record={editing}
+        defaultCurrency={currency}
+        submitting={submitting}
+        error={formError}
       />
+
+      <Dialog open={Boolean(deleting)} onOpenChange={(open) => !open && setDeleting(null)}>
+        <DialogContent size="sm">
+          <DialogHeader>
+            <DialogTitle>Delete this budget?</DialogTitle>
+            <DialogDescription>
+              “{deleting?.name}” will be removed permanently. Your expenses stay untouched.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDeleting(null)}>
+              Keep it
+            </Button>
+            <Button variant="destructive" onClick={handleDelete}>
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 };

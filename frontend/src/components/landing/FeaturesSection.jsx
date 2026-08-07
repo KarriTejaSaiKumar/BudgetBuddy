@@ -1,109 +1,60 @@
 import React from 'react';
-import { useTheme } from '../../context/ThemeContext';
-import { 
-  TrendingUp, 
-  Receipt, 
-  PieChart, 
-  PiggyBank, 
-  BarChart3, 
-  Lock, 
-  Globe2, 
-  LayoutDashboard 
-} from 'lucide-react';
+import { BarChart3, PiggyBank, Receipt, Wallet } from 'lucide-react';
+import Reveal from './Reveal';
 
-const FeaturesSection = () => {
-  const { isDark } = useTheme();
+const features = [
+  {
+    icon: Receipt,
+    title: 'Expense Management',
+    description:
+      'Log every spend with category, payment method and notes, then search, filter and sort your history in seconds.',
+  },
+  {
+    icon: Wallet,
+    title: 'Budget Planning',
+    description:
+      'Set monthly limits per category and watch utilisation update live, with clear on-track and over-budget states.',
+  },
+  {
+    icon: PiggyBank,
+    title: 'Savings Goals',
+    description:
+      'Define a target and a deadline, contribute as you go, and see exactly how far along each goal really is.',
+  },
+  {
+    icon: BarChart3,
+    title: 'Analytics & Reports',
+    description:
+      'Category breakdowns, monthly trends and exportable reports that turn raw transactions into decisions.',
+  },
+];
 
-  const features = [
-    {
-      icon: TrendingUp,
-      title: 'Income Management',
-      description: 'Categorize, monitor, and analyze all incoming revenue streams with real-time statistics.',
-      color: 'emerald',
-    },
-    {
-      icon: Receipt,
-      title: 'Expense Tracking',
-      description: 'Log daily expenditures, filter by category, and eliminate unnecessary spending leaks.',
-      color: 'rose',
-    },
-    {
-      icon: PieChart,
-      title: 'Smart Budget Planning',
-      description: 'Set category spending caps and receive instant alerts before overspending occurs.',
-      color: 'orange',
-    },
-    {
-      icon: PiggyBank,
-      title: 'Savings Goals',
-      description: 'Track progress toward financial milestones and automate targeted savings plans.',
-      color: 'amber',
-    },
-    {
-      icon: BarChart3,
-      title: 'Financial Analytics',
-      description: 'Interactive visual charts detailing monthly trends, distribution, and net cash flow.',
-      color: 'blue',
-    },
-    {
-      icon: Lock,
-      title: 'Secure Authentication',
-      description: 'Enterprise-grade JSON Web Token (JWT) authorization with isolated user accounts.',
-      color: 'violet',
-    },
-    {
-      icon: Globe2,
-      title: 'Multi-Currency Support',
-      description: 'Support for INR (₹), USD ($), EUR (€), GBP (£), JPY (¥), CAD, AUD, and SGD with formatters.',
-      color: 'cyan',
-    },
-    {
-      icon: LayoutDashboard,
-      title: 'Responsive Dashboard',
-      description: 'Smooth, high-density financial cockpit optimized for Desktop, Tablet, and Mobile screens.',
-      color: 'indigo',
-    },
-  ];
-
+export default function FeaturesSection() {
   return (
-    <section id="features" className="py-20 px-6 md:px-16 scroll-mt-20">
-      <div className="max-w-6xl mx-auto">
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <h2 className="text-xs font-extrabold text-orange-500 uppercase tracking-widest mb-3">Powerful Capabilities</h2>
-          <h3 className="text-3xl sm:text-5xl font-extrabold tracking-tight mb-4">
-            Everything You Need for Total Financial Mastery
-          </h3>
-          <p className={`text-base md:text-lg ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-            Built from the ground up to give you clarity, precision, and complete control over your money.
-          </p>
-        </div>
+    <section id="features" className="mx-auto max-w-6xl scroll-mt-20 px-5 py-16 sm:px-8 sm:py-24">
+      <Reveal className="max-w-2xl">
+        <p className="eyebrow">Features</p>
+        <h2 className="mt-3 text-3xl font-semibold tracking-[-0.02em] text-foreground sm:text-4xl">
+          Everything your money needs, nothing it doesn&apos;t.
+        </h2>
+        <p className="mt-4 text-base leading-relaxed text-muted-foreground">
+          Four focused modules that work together, so the whole picture stays one click away.
+        </p>
+      </Reveal>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {features.map((feature, idx) => {
-            const Icon = feature.icon;
-            return (
-              <div
-                key={idx}
-                className={`p-6 rounded-2xl border transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl ${
-                  isDark
-                    ? 'bg-[#181818] border-[#262626] hover:border-orange-500/40 shadow-orange-500/5'
-                    : 'bg-white border-slate-200 hover:border-orange-500/40 shadow-slate-200'
-                }`}
-              >
-                <div className="w-12 h-12 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-500 flex items-center justify-center mb-4">
-                  <Icon className="w-6 h-6" />
-                </div>
-                <h4 className="text-lg font-bold mb-2">{feature.title}</h4>
-                <p className={`text-sm leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                  {feature.description}
-                </p>
-              </div>
-            );
-          })}
-        </div>
+      <div className="mt-12 grid gap-4 sm:grid-cols-2">
+        {features.map((f, i) => (
+          <Reveal key={f.title} delay={i * 60}>
+            <article className="group glass h-full rounded-2xl p-6 transition-[transform,box-shadow] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-1 hover:shadow-[var(--shadow-lg)] sm:p-7">
+              <span className="grid size-11 place-items-center rounded-2xl bg-primary-soft text-primary transition-transform duration-200 group-hover:scale-105">
+                <f.icon className="size-5" />
+              </span>
+              <h3 className="mt-5 text-lg font-semibold tracking-tight text-foreground">{f.title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{f.description}</p>
+            </article>
+          </Reveal>
+        ))}
       </div>
     </section>
   );
-};
-
-export default FeaturesSection;
+}

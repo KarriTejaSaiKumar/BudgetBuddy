@@ -1,5 +1,6 @@
+import calendar
 from decimal import Decimal
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from django.utils import timezone
 from django.db.models import Sum, Count, Avg, Q
 
@@ -8,6 +9,30 @@ from expenses.models import Expense
 from budgets.models import Budget
 from savings.models import SavingsGoal
 from notifications.models import Notification
+
+
+def _resolve_date_range(timeframe=None, start_date=None, end_date=None):
+    """
+    Helper function to resolve start_date and end_date based on timeframe choice.
+    """
+    if isinstance(start_date, str):
+        start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+    if isinstance(end_date, str):
+        end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+
+    if timeframe == 'current_month':
+        today = date.today()
+        start_date = today.replace(day=1)
+        _, last_day = calendar.monthrange(today.year, today.month)
+        end_date = today.replace(day=last_day)
+    elif timeframe == 'previous_month':
+        today = date.today()
+        first_of_this_month = today.replace(day=1)
+        last_of_prev_month = first_of_this_month - timedelta(days=1)
+        start_date = last_of_prev_month.replace(day=1)
+        end_date = last_of_prev_month
+
+    return start_date, end_date
 
 
 def _get_date_range_filters(date_field_name, start_date=None, end_date=None):
@@ -26,10 +51,11 @@ def _get_date_range_filters(date_field_name, start_date=None, end_date=None):
     return q
 
 
-def get_monthly_financial_report(user, start_date=None, end_date=None):
+def get_monthly_financial_report(user, start_date=None, end_date=None, timeframe=None):
     """
     Compiles monthly financial summary report (Income, Expense, Balance, Savings, Remaining Budget).
     """
+    start_date, end_date = _resolve_date_range(timeframe, start_date, end_date)
     income_q = _get_date_range_filters('date', start_date, end_date)
     expense_q = _get_date_range_filters('expense_date', start_date, end_date)
 
@@ -44,7 +70,7 @@ def get_monthly_financial_report(user, start_date=None, end_date=None):
     total_budget = budget_agg['total'] or Decimal('0.00')
 
     current_balance = total_income - total_expense
-    remaining_budget = total_budget - total_expense
+    remaining_budget = max(Decimal('0.00'), total_budget - total_expense)
 
     return {
         "period": {
@@ -62,10 +88,11 @@ def get_monthly_financial_report(user, start_date=None, end_date=None):
     }
 
 
-def get_expense_report(user, start_date=None, end_date=None):
+def get_expense_report(user, start_date=None, end_date=None, timeframe=None):
     """
     Compiles itemized expense details and category breakdown for a selected date range.
     """
+    start_date, end_date = _resolve_date_range(timeframe, start_date, end_date)
     date_q = _get_date_range_filters('expense_date', start_date, end_date)
     expense_qs = Expense.objects.filter(Q(user=user) & date_q).order_by('-expense_date')
 
@@ -83,13 +110,18 @@ def get_expense_report(user, start_date=None, end_date=None):
 
     items = []
     for exp in expense_qs:
+        time_str = exp.transaction_time.strftime('%H:%M:%S') if getattr(exp, 'transaction_time', None) else "00:00:00"
         items.append({
             "id": str(exp.id),
             "title": exp.title,
             "category": exp.category,
             "category_display": exp.get_category_display(),
             "amount": float(exp.amount),
+            "currency": getattr(exp, 'currency', 'INR'),
+            "payment_method": getattr(exp, 'payment_method', 'cash'),
             "date": str(exp.expense_date),
+            "time": time_str,
+            "notes": exp.description or "",
             "description": exp.description or "",
         })
 
@@ -120,7 +152,51 @@ def get_expense_report(user, start_date=None, end_date=None):
     }
 
 
-def get_savings_report(user, start_date=None, end_date=None):
+def get_income_report(user, start_date=None, end_date=None, timeframe=None):
+    """
+    Compiles itemized income details and source breakdown for a selected date range.
+    """
+    start_date, end_date = _resolve_date_range(timeframe, start_date, end_date)
+    date_q = _get_date_range_filters('date', start_date, end_date)
+    income_qs = Income.objects.filter(Q(user=user) & date_q).order_by('-date')
+
+    totals_agg = income_qs.aggregate(
+        total_amount=Sum('amount'),
+        avg_amount=Avg('amount'),
+        total_count=Count('id')
+    )
+
+    items = []
+    for inc in income_qs:
+        time_str = inc.created_at.strftime('%H:%M:%S') if getattr(inc, 'created_at', None) else "00:00:00"
+        items.append({
+            "id": str(inc.id),
+            "source": inc.source,
+            "source_display": inc.get_source_display(),
+            "amount": float(inc.amount),
+            "currency": getattr(inc, 'currency', 'INR'),
+            "date": str(inc.date),
+            "time": time_str,
+            "notes": inc.description or "",
+        })
+
+    total_income = totals_agg['total_amount'] or Decimal('0.00')
+
+    return {
+        "period": {
+            "start_date": str(start_date) if start_date else None,
+            "end_date": str(end_date) if end_date else None,
+        },
+        "summary": {
+            "total_income": float(total_income),
+            "average_income": float(totals_agg['avg_amount'] or Decimal('0.00')),
+            "transaction_count": totals_agg['total_count'] or 0,
+        },
+        "incomes": items,
+    }
+
+
+def get_savings_report(user, start_date=None, end_date=None, timeframe=None):
     """
     Compiles detailed savings goal progress and completion metrics.
     """
@@ -137,13 +213,22 @@ def get_savings_report(user, start_date=None, end_date=None):
     total_remaining = max(Decimal('0.00'), total_target - total_saved)
     overall_progress = (float(total_saved) / float(total_target) * 100.0) if total_target > 0 else 0.0
 
+    today = date.today()
     items = []
     for goal in goals_qs:
         target = float(goal.target_amount)
         current = float(goal.current_amount)
         rem = max(0.0, target - current)
-        pct = (current / target * 100.0) if target > 0 else 0.0
-        status_label = "completed" if current >= target else "in_progress"
+        pct = min(round((current / target * 100.0), 2), 100.0) if target > 0 else 0.0
+
+        if goal.is_completed or current >= target:
+            status_label = "Completed"
+        elif goal.deadline and goal.deadline < today:
+            status_label = "Overdue"
+        elif current <= 0:
+            status_label = "Not Started"
+        else:
+            status_label = "In Progress"
 
         items.append({
             "id": str(goal.id),
@@ -168,42 +253,25 @@ def get_savings_report(user, start_date=None, end_date=None):
     }
 
 
-def get_financial_summary_report(user, start_date=None, end_date=None):
+def get_financial_summary_report(user, start_date=None, end_date=None, timeframe=None):
     """
     Combines Financial Summary, Expense Summary, Income Summary, Budget Summary, Savings Summary, and Latest Notifications.
     """
-    financial_summary = get_monthly_financial_report(user, start_date, end_date)
-    expense_report = get_expense_report(user, start_date, end_date)
-    savings_report = get_savings_report(user, start_date, end_date)
-
-    income_q = _get_date_range_filters('date', start_date, end_date)
-    income_qs = Income.objects.filter(Q(user=user) & income_q).order_by('-date')
-
-    income_sources = (
-        income_qs.values('source')
-        .annotate(total=Sum('amount'), count=Count('id'))
-        .order_by('-total')
-    )
-
-    income_items = []
-    for inc in income_qs[:10]:
-        income_items.append({
-            "id": str(inc.id),
-            "source": inc.source,
-            "source_display": inc.get_source_display(),
-            "amount": float(inc.amount),
-            "date": str(inc.date),
-            "description": inc.description or "",
-        })
+    financial_summary = get_monthly_financial_report(user, start_date, end_date, timeframe)
+    expense_report = get_expense_report(user, start_date, end_date, timeframe)
+    income_report = get_income_report(user, start_date, end_date, timeframe)
+    savings_report = get_savings_report(user, start_date, end_date, timeframe)
 
     budgets_qs = Budget.objects.filter(user=user).order_by('-year', '-month')
     budget_items = []
     for b in budgets_qs:
         budget_items.append({
             "id": str(b.id),
+            "budget_name": getattr(b, 'budget_name', b.get_category_display()),
             "category": b.category,
             "category_display": b.get_category_display(),
             "budget_amount": float(b.budget_amount),
+            "currency": getattr(b, 'currency', 'INR'),
             "month": b.month,
             "year": b.year,
         })
@@ -213,6 +281,7 @@ def get_financial_summary_report(user, start_date=None, end_date=None):
     for n in notifications_qs:
         notification_items.append({
             "id": str(n.id),
+            "title": getattr(n, 'title', 'Notification'),
             "message": n.message,
             "is_read": n.is_read,
             "created_at": n.created_at.isoformat(),
@@ -221,11 +290,7 @@ def get_financial_summary_report(user, start_date=None, end_date=None):
     return {
         "financial_summary": financial_summary['summary'],
         "expense_summary": expense_report['summary'],
-        "income_summary": {
-            "total_income": financial_summary['summary']['total_income'],
-            "sources": list(income_sources),
-            "recent_incomes": income_items,
-        },
+        "income_summary": income_report['summary'],
         "budget_summary": {
             "total_budget": financial_summary['summary']['total_budget'],
             "budgets": budget_items,
@@ -235,7 +300,7 @@ def get_financial_summary_report(user, start_date=None, end_date=None):
     }
 
 
-def get_export_ready_data(user, report_type='summary', start_date=None, end_date=None):
+def get_export_ready_data(user, report_type='summary', start_date=None, end_date=None, timeframe=None):
     """
     Returns normalized Python data structure formatted specifically for PDF and CSV file exports.
     """
@@ -243,41 +308,65 @@ def get_export_ready_data(user, report_type='summary', start_date=None, end_date
     user_identifier = user.email if getattr(user, 'email', None) else user.username
 
     if report_type == 'expenses':
-        raw_data = get_expense_report(user, start_date, end_date)
+        raw_data = get_expense_report(user, start_date, end_date, timeframe)
         title = "Itemized Expense Report"
-        headers = ["Date", "Title", "Category", "Amount", "Description"]
+        headers = ["Date", "Time", "Title", "Category", "Payment Method", "Amount", "Currency", "Notes"]
         rows = [
-            [item["date"], item["title"], item["category_display"], f"${item['amount']:.2f}", item["description"]]
+            [
+                item["date"],
+                item["time"],
+                item["title"],
+                item["category_display"],
+                item["payment_method"],
+                f"{item['amount']:.2f}",
+                item["currency"],
+                item["notes"]
+            ]
             for item in raw_data["expenses"]
         ]
+    elif report_type in ['incomes', 'income']:
+        raw_data = get_income_report(user, start_date, end_date, timeframe)
+        title = "Itemized Income Report"
+        headers = ["Date", "Time", "Source", "Amount", "Currency", "Notes"]
+        rows = [
+            [
+                item["date"],
+                item["time"],
+                item["source_display"],
+                f"{item['amount']:.2f}",
+                item["currency"],
+                item["notes"]
+            ]
+            for item in raw_data["incomes"]
+        ]
     elif report_type == 'savings':
-        raw_data = get_savings_report(user, start_date, end_date)
+        raw_data = get_savings_report(user, start_date, end_date, timeframe)
         title = "Savings Goals Progress Report"
         headers = ["Goal Name", "Target Amount", "Saved Amount", "Remaining", "Progress", "Deadline", "Status"]
         rows = [
             [
                 item["goal_name"],
-                f"${item['target_amount']:.2f}",
-                f"${item['saved_amount']:.2f}",
-                f"${item['remaining_amount']:.2f}",
+                f"{item['target_amount']:.2f}",
+                f"{item['saved_amount']:.2f}",
+                f"{item['remaining_amount']:.2f}",
                 f"{item['progress_percentage']:.1f}%",
                 item["deadline"],
-                item["status"].upper(),
+                item["status"]
             ]
             for item in raw_data["savings_goals"]
         ]
     else:
-        raw_data = get_financial_summary_report(user, start_date, end_date)
+        raw_data = get_financial_summary_report(user, start_date, end_date, timeframe)
         title = "Comprehensive Financial Summary Report"
-        headers = ["Metric", "Amount ($)"]
+        headers = ["Metric", "Amount"]
         summary = raw_data["financial_summary"]
         rows = [
-            ["Total Income", f"${summary['total_income']:.2f}"],
-            ["Total Expense", f"${summary['total_expense']:.2f}"],
-            ["Net Balance", f"${summary['current_balance']:.2f}"],
-            ["Total Savings", f"${summary['total_savings']:.2f}"],
-            ["Total Budget", f"${summary['total_budget']:.2f}"],
-            ["Remaining Budget", f"${summary['remaining_budget']:.2f}"],
+            ["Total Income", f"{summary['total_income']:.2f}"],
+            ["Total Expense", f"{summary['total_expense']:.2f}"],
+            ["Net Balance", f"{summary['current_balance']:.2f}"],
+            ["Total Savings", f"{summary['total_savings']:.2f}"],
+            ["Total Budget", f"{summary['total_budget']:.2f}"],
+            ["Remaining Budget", f"{summary['remaining_budget']:.2f}"],
         ]
 
     return {
@@ -295,3 +384,4 @@ def get_export_ready_data(user, report_type='summary', start_date=None, end_date
         },
         "raw_data": raw_data,
     }
+

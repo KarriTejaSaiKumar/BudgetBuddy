@@ -20,19 +20,19 @@ const Modal = ({ isOpen, onClose, title, children, maxWidth = "max-w-md" }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div
-        onClick={onClose}
-        className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs transition-opacity"
-      />
+      <div onClick={onClose} className="fixed inset-0 bg-foreground/25 backdrop-blur-[2px] transition-opacity" />
 
-      <div className={`relative w-full ${maxWidth} bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-2xl z-10 space-y-4 animate-in fade-in zoom-in duration-200`}>
-        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-          <h3 className="text-base font-bold text-slate-900 dark:text-white">{title}</h3>
+      <div
+        className={`relative z-10 w-full ${maxWidth} animate-in fade-in zoom-in-95 space-y-5 rounded-2xl bg-popover p-6 text-popover-foreground shadow-lg shadow-[0_0_0_1px_var(--color-hairline)] duration-200`}
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-hairline pb-4">
+          <h3 className="text-base font-medium tracking-tight text-foreground">{title}</h3>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+            aria-label="Close"
+            className="-mr-1 grid size-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
-            <X className="w-5 h-5" />
+            <X className="size-4" />
           </button>
         </div>
         <div>{children}</div>

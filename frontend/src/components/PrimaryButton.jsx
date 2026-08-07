@@ -6,9 +6,9 @@ const PrimaryButton = ({ children, onClick, type = "button", disabled = false, c
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`px-4 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-400 hover:to-amber-500 text-white font-semibold text-xs shadow-lg shadow-orange-500/20 active:scale-95 transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none cursor-pointer ${className}`}
+      className={`inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow-xs transition-[background-color,box-shadow,transform] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-primary/90 hover:shadow-sm active:translate-y-px disabled:pointer-events-none disabled:opacity-45 ${className}`}
     >
-      {Icon && <Icon className="w-4 h-4 shrink-0" />}
+      {Icon && <Icon className="size-4 shrink-0" />}
       <span>{children}</span>
     </button>
   );

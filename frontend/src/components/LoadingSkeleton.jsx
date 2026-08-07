@@ -3,23 +3,26 @@ import React from 'react';
 const LoadingSkeleton = ({ count = 3, type = "card" }) => {
   if (type === "table") {
     return (
-      <div className="space-y-3 animate-pulse p-4">
+      <div className="animate-pulse space-y-3 p-4">
         {[...Array(count)].map((_, i) => (
-          <div key={i} className="h-10 bg-slate-800/50 rounded-xl w-full" />
+          <div key={i} className="h-10 w-full rounded-xl bg-muted" />
         ))}
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 animate-pulse">
+    <div className="grid animate-pulse grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {[...Array(count)].map((_, i) => (
-        <div key={i} className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800/80 h-32 flex flex-col justify-between">
-          <div className="flex justify-between items-center">
-            <div className="h-3 bg-slate-800 rounded w-24" />
-            <div className="w-8 h-8 rounded-lg bg-slate-800" />
+        <div
+          key={i}
+          className="flex h-32 flex-col justify-between rounded-2xl bg-card p-5 shadow-[0_0_0_1px_var(--color-hairline)]"
+        >
+          <div className="flex items-center justify-between">
+            <div className="h-2.5 w-24 rounded-full bg-muted" />
+            <div className="size-8 rounded-lg bg-muted" />
           </div>
-          <div className="h-6 bg-slate-800 rounded w-32" />
+          <div className="h-6 w-32 rounded-md bg-muted" />
         </div>
       ))}
     </div>

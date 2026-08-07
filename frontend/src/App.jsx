@@ -11,8 +11,13 @@ import Dashboard from './pages/Dashboard';
 import Expenses from './pages/Expenses';
 import Income from './pages/Income';
 import Budgets from './pages/Budgets';
+import Savings from './pages/Savings';
+import Analytics from './pages/Analytics';
 import Reports from './pages/Reports';
+import Notifications from './pages/Notifications';
+import Profile from './pages/Profile';
 import Settings from './pages/Settings';
+import DesignSystem from './pages/DesignSystem';
 import './App.css';
 
 function App() {
@@ -27,6 +32,7 @@ function App() {
                 <Route path="/" element={<Home />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
+                <Route path="/design-system" element={<DesignSystem />} />
 
                 {/* Protected Routes */}
                 <Route 
@@ -62,6 +68,22 @@ function App() {
                   } 
                 />
                 <Route 
+                  path="/savings" 
+                  element={
+                    <ProtectedRoute>
+                      <Savings />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/analytics" 
+                  element={
+                    <ProtectedRoute>
+                      <Analytics />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
                   path="/reports" 
                   element={
                     <ProtectedRoute>
@@ -76,6 +98,22 @@ function App() {
                       <Settings />
                     </ProtectedRoute>
                   } 
+                />
+                <Route
+                  path="/notifications"
+                  element={
+                    <ProtectedRoute>
+                      <Notifications />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/profile"
+                  element={
+                    <ProtectedRoute>
+                      <Profile />
+                    </ProtectedRoute>
+                  }
                 />
 
                 {/* Catch-all Redirect */}

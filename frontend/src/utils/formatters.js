@@ -105,3 +105,15 @@ export const convertCurrency = (amount, fromCurrency = 'USD', toCurrency = 'USD'
   const amountInUSD = amount / fromRate;
   return amountInUSD * toRate;
 };
+
+/** "3h ago" style stamp used by the notification feed. */
+export const relativeTime = (value) => {
+  const then = new Date(value);
+  if (Number.isNaN(then.getTime())) return '';
+  const diff = Math.round((Date.now() - then.getTime()) / 1000);
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+  return then.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+};

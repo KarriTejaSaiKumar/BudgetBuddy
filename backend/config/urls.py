@@ -18,6 +18,8 @@ urlpatterns = [
     
     # User authentication endpoints (Registration, etc.)
     path('api/auth/', include('users.urls')),
+    path('api/profile/', include('users.profile_urls')),
+
 
     # Dashboard API endpoint
     path('api/dashboard/', DashboardSummaryView.as_view(), name='dashboard-summary'),

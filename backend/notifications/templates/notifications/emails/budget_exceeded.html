@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Budget Exceeded</title>
+    <style>
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f4f6f8; margin: 0; padding: 0; color: #333333; }
+        .container { max-width: 600px; margin: 30px auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); }
+        .header { background: linear-gradient(135deg, #ef4444, #dc2626); padding: 24px; text-align: center; color: #ffffff; }
+        .header h1 { margin: 0; font-size: 24px; font-weight: 700; }
+        .content { padding: 32px 24px; }
+        .greeting { font-size: 18px; font-weight: 600; margin-bottom: 16px; color: #1f2937; }
+        .alert-card { background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 20px; border-radius: 4px; margin: 20px 0; }
+        .alert-title { font-size: 16px; font-weight: 700; color: #991b1b; margin-bottom: 8px; }
+        .details-table { width: 100%; margin-top: 16px; border-collapse: collapse; }
+        .details-table td { padding: 8px 0; font-size: 14px; border-bottom: 1px dashed #fca5a5; }
+        .details-table td.label { font-weight: 600; color: #991b1b; }
+        .details-table td.value { text-align: right; font-weight: 700; color: #b91c1c; }
+        .btn-container { text-align: center; margin-top: 32px; }
+        .btn { display: inline-block; background-color: #ef4444; color: #ffffff !important; font-size: 15px; font-weight: 600; text-decoration: none; padding: 12px 28px; border-radius: 6px; }
+        .footer { background-color: #f9fafb; padding: 20px 24px; text-align: center; font-size: 13px; color: #9ca3af; border-top: 1px solid #e5e7eb; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Budget Exceeded!</h1>
+        </div>
+        <div class="content">
+            <div class="greeting">Hi {{ user.username }},</div>
+            <div class="alert-card">
+                <div class="alert-title">Budget Limit Exceeded</div>
+                <p>Your expenses have exceeded your set budget for <strong>{{ budget_name }}</strong>.</p>
+                <table class="details-table">
+                    <tr>
+                        <td class="label">Budget Category:</td>
+                        <td class="value">{{ budget_name }}</td>
+                    </tr>
+                    <tr>
+                        <td class="label">Amount Spent:</td>
+                        <td class="value">{{ currency }} {{ spent }}</td>
+                    </tr>
+                    <tr>
+                        <td class="label">Target Limit:</td>
+                        <td class="value">{{ currency }} {{ limit }}</td>
+                    </tr>
+                </table>
+            </div>
+            <div class="btn-container">
+                <a href="{{ action_url|default:'http://localhost:3000/budgets' }}" class="btn">Manage Budget</a>
+            </div>
+        </div>
+        <div class="footer">
+            <p>&copy; 2026 BudgetBuddy Platform. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
-import PrimaryButton from '../components/PrimaryButton';
-import { User, Mail, Lock, Eye, EyeOff, AlertCircle, Rocket, Sun, Moon, ArrowRight } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, Lock, Mail, User } from 'lucide-react';
+import { Alert, Button, Field, Input, Separator } from '@/components/ui';
+import AuthShell from '../components/landing/AuthShell';
 
 const Register = () => {
   const [username, setUsername] = useState('');
@@ -16,7 +16,6 @@ const Register = () => {
   const [loading, setLoading] = useState(false);
 
   const { register } = useAuth();
-  const { isDark, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -50,197 +49,126 @@ const Register = () => {
   };
 
   return (
-    <div className={`min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden transition-colors duration-300 ${
-      isDark ? 'bg-[#0B0B0B] text-slate-100' : 'bg-slate-50 text-slate-900'
-    }`}>
-      {/* Background Ambient Glow */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-orange-500/10 blur-[140px] rounded-full pointer-events-none" />
-
-      {/* Top Header Theme Toggle */}
-      <div className="absolute top-6 right-6 z-20">
-        <button
-          onClick={toggleTheme}
-          className={`p-2.5 rounded-xl border transition-all duration-200 ${
-            isDark 
-              ? 'bg-[#181818] border-[#262626] text-amber-400 hover:border-amber-400/50 hover:bg-[#202020]' 
-              : 'bg-white border-slate-300 text-slate-700 hover:border-slate-400 hover:bg-slate-100'
-          }`}
-          title={isDark ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
-          aria-label="Toggle theme"
-        >
-          {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-        </button>
-      </div>
-
-      {/* Main Authentication Card */}
-      <div className={`w-full max-w-md rounded-2xl p-8 border shadow-2xl relative z-10 space-y-6 transition-all duration-300 ${
-        isDark ? 'bg-[#181818] border-[#262626] shadow-orange-500/5' : 'bg-white border-slate-200 shadow-slate-200'
-      }`}>
-        {/* Header Branding */}
-        <div className="text-center space-y-2">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-orange-500 to-amber-500 text-white flex items-center justify-center font-extrabold mx-auto shadow-lg shadow-orange-500/25">
-            <Rocket className="w-6 h-6" />
-          </div>
-          <h1 className="text-2xl font-extrabold tracking-tight">Create Your Account</h1>
-          <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-            Track your income, expenses, budgets, and financial health in one place.
-          </p>
-        </div>
-
-        {/* Reusable Error Alert Banner */}
-        {error && (
-          <div role="alert" className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-500 text-xs flex items-center gap-2.5 animate-in fade-in duration-200">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        {/* Register Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Full Name / Username Input */}
-          <div>
-            <label className={`block text-xs font-semibold uppercase tracking-wider mb-1.5 ${
-              isDark ? 'text-slate-300' : 'text-slate-700'
-            }`}>
-              Full Name or Username *
-            </label>
-            <div className="relative">
-              <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="commander_astro"
-                className={`w-full pl-10 pr-3.5 py-2.5 rounded-xl border text-sm transition-all focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 ${
-                  isDark 
-                    ? 'bg-[#0B0B0B] border-[#262626] text-white placeholder-slate-500' 
-                    : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400'
-                }`}
-                required
-                aria-label="Full Name or Username"
-              />
-            </div>
-          </div>
-
-          {/* Email Input */}
-          <div>
-            <label className={`block text-xs font-semibold uppercase tracking-wider mb-1.5 ${
-              isDark ? 'text-slate-300' : 'text-slate-700'
-            }`}>
-              Email Address *
-            </label>
-            <div className="relative">
-              <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@company.com"
-                className={`w-full pl-10 pr-3.5 py-2.5 rounded-xl border text-sm transition-all focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 ${
-                  isDark 
-                    ? 'bg-[#0B0B0B] border-[#262626] text-white placeholder-slate-500' 
-                    : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400'
-                }`}
-                required
-                aria-label="Email Address"
-              />
-            </div>
-          </div>
-
-          {/* Password Input */}
-          <div>
-            <label className={`block text-xs font-semibold uppercase tracking-wider mb-1.5 ${
-              isDark ? 'text-slate-300' : 'text-slate-700'
-            }`}>
-              Password *
-            </label>
-            <div className="relative">
-              <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••••••"
-                className={`w-full pl-10 pr-10 py-2.5 rounded-xl border text-sm transition-all focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 ${
-                  isDark 
-                    ? 'bg-[#0B0B0B] border-[#262626] text-white placeholder-slate-500' 
-                    : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400'
-                }`}
-                required
-                aria-label="Password"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-orange-500 transition cursor-pointer"
-                title={showPassword ? "Hide password" : "Show password"}
-                aria-label={showPassword ? "Hide password" : "Show password"}
-              >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-            </div>
-          </div>
-
-          {/* Confirm Password Input */}
-          <div>
-            <label className={`block text-xs font-semibold uppercase tracking-wider mb-1.5 ${
-              isDark ? 'text-slate-300' : 'text-slate-700'
-            }`}>
-              Confirm Password *
-            </label>
-            <div className="relative">
-              <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type={showConfirmPassword ? 'text' : 'password'}
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="••••••••••••"
-                className={`w-full pl-10 pr-10 py-2.5 rounded-xl border text-sm transition-all focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 ${
-                  isDark 
-                    ? 'bg-[#0B0B0B] border-[#262626] text-white placeholder-slate-500' 
-                    : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400'
-                }`}
-                required
-                aria-label="Confirm Password"
-              />
-              <button
-                type="button"
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-orange-500 transition cursor-pointer"
-                title={showConfirmPassword ? "Hide password" : "Show password"}
-                aria-label={showConfirmPassword ? "Hide password" : "Show password"}
-              >
-                {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-            </div>
-          </div>
-
-          {/* Primary Action Button (NASA Orange) */}
-          <div className="pt-2">
-            <PrimaryButton
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 text-sm font-semibold shadow-lg shadow-orange-500/20"
-              icon={ArrowRight}
-            >
-              {loading ? 'Creating Account...' : 'Create Account'}
-            </PrimaryButton>
-          </div>
-        </form>
-
-        {/* Footer Navigation Link */}
-        <div className={`text-center pt-3 border-t text-xs ${
-          isDark ? 'border-[#262626] text-slate-400' : 'border-slate-200 text-slate-600'
-        }`}>
+    <AuthShell
+      title="Create your account"
+      subtitle="Start tracking income, expenses, budgets and goals in minutes."
+      footer={
+        <>
           Already have an account?{' '}
-          <Link to="/login" className="text-orange-500 hover:underline font-bold transition">
-            Login
+          <Link to="/login" className="font-medium text-primary transition-colors duration-200 hover:underline">
+            Sign in
           </Link>
-        </div>
+        </>
+      }
+    >
+      {error && (
+        <Alert variant="error" className="mb-5">
+          {error}
+        </Alert>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <Field label="Username" required>
+          <div className="relative">
+            <User className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="yourname"
+              autoComplete="username"
+              className="pl-10"
+              required
+            />
+          </div>
+        </Field>
+
+        <Field label="Email address" required>
+          <div className="relative">
+            <Mail className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="name@company.com"
+              autoComplete="email"
+              className="pl-10"
+              required
+            />
+          </div>
+        </Field>
+
+        <Field label="Password" required>
+          <div className="relative">
+            <Lock className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="At least 8 characters"
+              autoComplete="new-password"
+              className="pl-10 pr-10"
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground transition-colors duration-200 hover:text-foreground"
+            >
+              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            </button>
+          </div>
+        </Field>
+
+        <Field label="Confirm password" required>
+          <div className="relative">
+            <Lock className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type={showConfirmPassword ? 'text' : 'password'}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Re-enter your password"
+              autoComplete="new-password"
+              className="pl-10 pr-10"
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowConfirmPassword((v) => !v)}
+              aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground transition-colors duration-200 hover:text-foreground"
+            >
+              {showConfirmPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            </button>
+          </div>
+        </Field>
+
+        <Button type="submit" size="lg" className="w-full" disabled={loading}>
+          {loading ? 'Creating account…' : 'Create free account'}
+          {!loading && <ArrowRight className="size-4" />}
+        </Button>
+      </form>
+
+      <div className="relative my-6">
+        <Separator />
+        <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-3 text-xs uppercase tracking-wide text-muted-foreground">
+          or
+        </span>
       </div>
-    </div>
+
+      <Button type="button" variant="secondary" size="lg" className="w-full" disabled title="Coming soon">
+        <span
+          aria-hidden="true"
+          className="grid size-4 place-items-center rounded-full border border-current text-[0.6rem] font-bold"
+        >
+          G
+        </span>
+        Continue with Google
+      </Button>
+      <p className="mt-2 text-center text-xs text-muted-foreground">Google sign-up is not enabled yet.</p>
+    </AuthShell>
   );
 };
 
 export default Register;
-

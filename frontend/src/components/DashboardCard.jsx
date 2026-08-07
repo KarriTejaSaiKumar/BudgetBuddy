@@ -7,32 +7,32 @@ const DashboardCard = ({
   amount,
   currency: itemCurrency,
   icon: Icon,
-  iconBg = "bg-orange-500/10 text-orange-500 border-orange-500/20",
+  iconBg = "bg-primary-soft text-foreground",
   subtitle,
-  subtitleColor = "text-slate-500 dark:text-slate-400",
+  subtitleColor = "text-muted-foreground",
   className = ""
 }) => {
   const { currency: globalCurrency, numberFormat } = useFinancialPreferences();
   const displayCurrency = itemCurrency || globalCurrency;
 
   return (
-    <div className={`p-5 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800/80 shadow-xs hover:border-orange-500/30 transition-all duration-200 flex flex-col justify-between ${className}`}>
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{title}</span>
+    <div
+      className={`flex flex-col justify-between rounded-2xl bg-card p-5 shadow-[0_0_0_1px_var(--color-hairline)] transition-[box-shadow,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 hover:shadow-[0_0_0_1px_var(--color-border),var(--shadow-md)] ${className}`}
+    >
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <span className="eyebrow">{title}</span>
         {Icon && (
-          <div className={`w-9 h-9 rounded-xl flex items-center justify-center border ${iconBg}`}>
-            <Icon className="w-4.5 h-4.5" />
+          <div className={`grid size-8 shrink-0 place-items-center rounded-lg ${iconBg}`}>
+            <Icon className="size-4" />
           </div>
         )}
       </div>
 
       <div>
-        <div className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+        <div className="truncate text-2xl font-medium tabular tracking-tight text-foreground">
           {formatCurrency(amount, displayCurrency, numberFormat)}
         </div>
-        {subtitle && (
-          <p className={`text-xs font-medium mt-1 ${subtitleColor}`}>{subtitle}</p>
-        )}
+        {subtitle && <p className={`mt-1.5 text-xs ${subtitleColor}`}>{subtitle}</p>}
       </div>
     </div>
   );

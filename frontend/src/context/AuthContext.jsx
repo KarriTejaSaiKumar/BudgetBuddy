@@ -37,6 +37,13 @@ export const AuthProvider = ({ children }) => {
       currency,
       bio
     });
+    const { tokens, user: userData } = response.data || {};
+    if (tokens?.access) {
+      localStorage.setItem('access_token', tokens.access);
+      localStorage.setItem('refresh_token', tokens.refresh);
+      localStorage.setItem('user', JSON.stringify(userData));
+      setUser(userData);
+    }
     return response.data;
   };
 

@@ -87,7 +87,7 @@ class DashboardSummaryView(APIView):
 class ProtectedBudgetSummaryView(APIView):
     """
     GET /api/budgets/<uuid:pk>/summary/
-    Returns budget summary statistics (budget_amount, total_expense, remaining_budget, overspent_amount)
+    Returns budget summary statistics (budget_name, currency, budget_amount, amount_spent, remaining_amount, utilization_percentage, status)
     for a specific budget belonging to the authenticated user.
     """
     permission_classes = [permissions.IsAuthenticated]
@@ -101,26 +101,46 @@ class ProtectedBudgetSummaryView(APIView):
         ).aggregate(total=Sum('amount'))['total']
 
         budget_amount = float(budget.budget_amount)
-        total_expense = float(expense_aggregate) if expense_aggregate is not None else 0.0
+        amount_spent = float(expense_aggregate) if expense_aggregate is not None else 0.0
 
-        remaining_budget = budget_amount - total_expense
+        remaining_amount = budget_amount - amount_spent
 
-        if remaining_budget < 0:
-            overspent_amount = total_expense - budget_amount
-            remaining_budget = 0.0
+        if remaining_amount < 0:
+            overspent_amount = amount_spent - budget_amount
+            remaining_amount = 0.0
         else:
             overspent_amount = 0.0
 
+        if budget_amount > 0:
+            utilization_percentage = round((amount_spent / budget_amount) * 100, 2)
+        else:
+            utilization_percentage = 0.0
+
+        if utilization_percentage >= 100:
+            budget_status = "Over Budget"
+        elif utilization_percentage >= 80:
+            budget_status = "Near Limit"
+        else:
+            budget_status = "On Track"
+
         return Response(
             {
+                "id": str(budget.id),
+                "budget_name": budget.budget_name if budget.budget_name else budget.get_category_display(),
                 "category": budget.get_category_display(),
+                "currency": budget.currency,
                 "budget_amount": budget_amount,
-                "total_expense": total_expense,
-                "remaining_budget": remaining_budget,
+                "amount_spent": amount_spent,
+                "total_expense": amount_spent,
+                "remaining_amount": remaining_amount,
+                "remaining_budget": remaining_amount,
                 "overspent_amount": overspent_amount,
+                "utilization_percentage": utilization_percentage,
+                "status": budget_status,
             },
             status=status.HTTP_200_OK,
         )
+
 
 
 class BudgetCreateView(generics.CreateAPIView):
@@ -135,6 +155,64 @@ class BudgetCreateView(generics.CreateAPIView):
         serializer.save(user=self.request.user)
 
 
+SORT_OPTIONS = {
+    'start_date': ['start_date', '-created_at'],
+    '-start_date': ['-start_date', '-created_at'],
+    'end_date': ['end_date', '-created_at'],
+    '-end_date': ['-end_date', '-created_at'],
+    'budget_amount': ['budget_amount', '-created_at'],
+    '-budget_amount': ['-budget_amount', '-created_at'],
+    'highest': ['-budget_amount', '-created_at'],
+    'lowest': ['budget_amount', '-created_at'],
+    'latest': ['-start_date', '-created_at'],
+    'oldest': ['start_date', 'created_at'],
+}
+
+def filter_and_sort_budgets(queryset, query_params):
+    category = query_params.get('category', None)
+    if category is not None and category.strip():
+        category = category.strip().lower()
+        valid_keys = [choice[0] for choice in Budget.CATEGORY_CHOICES]
+        if category not in valid_keys:
+            raise serializers.ValidationError(
+                {"category": f"'{category}' is not a valid category. Valid choices are: {', '.join(valid_keys)}."}
+            )
+        queryset = queryset.filter(category=category)
+
+    currency = query_params.get('currency', None)
+    if currency is not None and currency.strip():
+        currency = currency.strip().upper()
+        valid_keys = [choice[0] for choice in Budget.CURRENCY_CHOICES]
+        if currency not in valid_keys:
+            raise serializers.ValidationError(
+                {"currency": f"'{currency}' is not a valid currency. Valid choices are: {', '.join(valid_keys)}."}
+            )
+        queryset = queryset.filter(currency=currency)
+
+    is_active = query_params.get('is_active', None)
+    if is_active is not None and is_active.strip():
+        val = is_active.strip().lower()
+        if val in ['true', '1']:
+            queryset = queryset.filter(is_active=True)
+        elif val in ['false', '0']:
+            queryset = queryset.filter(is_active=False)
+
+    sort = query_params.get('sort', None)
+    if sort is not None and sort.strip():
+        sort_key = sort.strip()
+        sort_key_lower = sort_key.lower()
+        if sort_key_lower in SORT_OPTIONS:
+            queryset = queryset.order_by(*SORT_OPTIONS[sort_key_lower])
+        elif sort_key in ['start_date', '-start_date', 'end_date', '-end_date', 'budget_amount', '-budget_amount']:
+            queryset = queryset.order_by(sort_key)
+        else:
+            raise serializers.ValidationError(
+                {"sort": f"'{sort}' is not a valid sort option."}
+            )
+
+    return queryset
+
+
 class BudgetListView(generics.ListAPIView):
     """
     GET /api/budgets/ - List all budget records for the authenticated user.
@@ -143,7 +221,9 @@ class BudgetListView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return Budget.objects.filter(user=self.request.user)
+        queryset = Budget.objects.filter(user=self.request.user)
+        return filter_and_sort_budgets(queryset, self.request.query_params)
+
 
 
 class BudgetRetrieveView(generics.RetrieveAPIView):

@@ -18,8 +18,13 @@ class ExpenseReportItemSerializer(serializers.Serializer):
     """
     title = serializers.CharField(max_length=255)
     category = serializers.CharField(max_length=100)
+    category_display = serializers.CharField(max_length=100, required=False)
     amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+    currency = serializers.CharField(max_length=10, default='INR', required=False)
+    payment_method = serializers.CharField(max_length=50, default='cash', required=False)
     date = serializers.CharField(max_length=50)
+    time = serializers.CharField(max_length=50, required=False, default='00:00:00')
+    notes = serializers.CharField(max_length=500, required=False, allow_blank=True, allow_null=True)
     description = serializers.CharField(max_length=500, required=False, allow_blank=True, allow_null=True)
 
 
@@ -33,6 +38,28 @@ class ExpenseReportSerializer(serializers.Serializer):
     expenses = ExpenseReportItemSerializer(many=True)
 
 
+class IncomeReportItemSerializer(serializers.Serializer):
+    """
+    Serializer for itemized income report records.
+    """
+    source = serializers.CharField(max_length=100)
+    source_display = serializers.CharField(max_length=100, required=False)
+    amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+    currency = serializers.CharField(max_length=10, default='INR', required=False)
+    date = serializers.CharField(max_length=50)
+    time = serializers.CharField(max_length=50, required=False, default='00:00:00')
+    notes = serializers.CharField(max_length=500, required=False, allow_blank=True, allow_null=True)
+
+
+class IncomeReportSerializer(serializers.Serializer):
+    """
+    Serializer for full income report response.
+    """
+    period = serializers.DictField(required=False)
+    summary = serializers.DictField()
+    incomes = IncomeReportItemSerializer(many=True)
+
+
 class SavingsReportItemSerializer(serializers.Serializer):
     """
     Serializer for individual savings report goal records.
@@ -42,6 +69,7 @@ class SavingsReportItemSerializer(serializers.Serializer):
     saved_amount = serializers.DecimalField(max_digits=12, decimal_places=2)
     remaining_amount = serializers.DecimalField(max_digits=12, decimal_places=2)
     progress_percentage = serializers.FloatField(min_value=0.0)
+    deadline = serializers.CharField(max_length=50)
     status = serializers.CharField(max_length=50)
 
 
@@ -101,3 +129,4 @@ class DateFilterSerializer(serializers.Serializer):
             })
 
         return attrs
+

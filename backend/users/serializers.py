@@ -6,7 +6,51 @@ from .models import Profile
 class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = Profile
-        fields = ('id', 'phone', 'profile_picture', 'bio', 'currency', 'created_at', 'updated_at')
+        fields = (
+            'id', 'phone', 'profile_picture', 'bio', 'currency', 'preferred_currency',
+            'theme_preference', 'email_notifications', 'budget_notifications',
+            'savings_notifications', 'report_notifications', 'language', 'timezone',
+            'created_at', 'updated_at'
+        )
+
+class UserPreferencesSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Profile
+        fields = (
+            'preferred_currency',
+            'theme_preference',
+            'email_notifications',
+            'budget_notifications',
+            'savings_notifications',
+            'report_notifications',
+            'language',
+            'timezone',
+        )
+
+    def validate_preferred_currency(self, value):
+        if value:
+            value = value.strip().upper()
+            valid_currencies = [choice[0] for choice in Profile.CURRENCY_CHOICES]
+            if value not in valid_currencies:
+                raise serializers.ValidationError(f"'{value}' is not a valid currency. Allowed choices: {', '.join(valid_currencies)}.")
+        return value
+
+    def validate_theme_preference(self, value):
+        if value:
+            value = value.strip().lower()
+            valid_themes = [choice[0] for choice in Profile.THEME_CHOICES]
+            if value not in valid_themes:
+                raise serializers.ValidationError(f"'{value}' is not a valid theme preference. Allowed choices: {', '.join(valid_themes)}.")
+        return value
+
+    def validate_language(self, value):
+        if value:
+            value = value.strip()
+            valid_languages = [choice[0] for choice in Profile.LANGUAGE_CHOICES]
+            if value not in valid_languages:
+                raise serializers.ValidationError(f"'{value}' is not a valid language preference. Allowed choices: {', '.join(valid_languages)}.")
+        return value
+
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=6, style={'input_type': 'password'})
@@ -39,8 +83,9 @@ class RegisterSerializer(serializers.ModelSerializer):
         
         Profile.objects.update_or_create(
             user=user,
-            defaults={'phone': phone, 'currency': currency, 'bio': bio}
+            defaults={'phone': phone, 'currency': currency, 'preferred_currency': currency, 'bio': bio}
         )
+
         return user
 
 class UserSerializer(serializers.ModelSerializer):

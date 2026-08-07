@@ -3,19 +3,20 @@ import { X } from 'lucide-react';
 
 const FormContainer = ({ title, subtitle, onClose, children, className = "" }) => {
   return (
-    <div className={`p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/90 shadow-xs relative transition-colors duration-200 ${className}`}>
-      <div className="flex items-center justify-between mb-4 border-b border-slate-100 dark:border-slate-800 pb-3">
-        <div>
-          <h3 className="text-base font-bold text-slate-900 dark:text-white">{title}</h3>
-          {subtitle && <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{subtitle}</p>}
+    <div className={`rounded-2xl bg-card p-6 shadow-[0_0_0_1px_var(--color-hairline)] sm:p-7 ${className}`}>
+      <div className="mb-6 flex items-start justify-between gap-4 border-b border-hairline pb-4">
+        <div className="min-w-0">
+          <h3 className="text-base font-medium tracking-tight text-foreground">{title}</h3>
+          {subtitle && <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>}
         </div>
         {onClose && (
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+            aria-label="Close"
+            className="-mr-1 grid size-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
-            <X className="w-5 h-5" />
+            <X className="size-4" />
           </button>
         )}
       </div>

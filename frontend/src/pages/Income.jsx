@@ -1,66 +1,93 @@
-import React, { useState, useEffect } from 'react';
-import AppLayout from '../layouts/AppLayout';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  PageHeader,
-  DashboardCard,
-  TableContainer,
-  SearchBar,
-  StatusBadge,
-  PrimaryButton,
-  SecondaryButton,
-  Modal,
-  ConfirmationDialog,
-  EmptyState,
-  LoadingSkeleton
-} from '../components';
+  ArrowUpRight,
+  CalendarRange,
+  Layers,
+  Pencil,
+  Plus,
+  Trash2,
+  TrendingUp,
+  Wallet,
+} from 'lucide-react';
+import AppLayout from '../layouts/AppLayout';
 import api from '../services/api';
 import { useFinancialPreferences } from '../context/FinancialPreferencesContext';
-import { formatCurrency, formatDate, SUPPORTED_CURRENCIES } from '../utils/formatters';
+import { formatCurrency, formatDate } from '../utils/formatters';
 import {
-  TrendingUp,
-  Plus,
-  Filter,
-  ArrowUpDown,
-  Edit2,
-  Trash2,
-  AlertCircle,
-  DollarSign,
-  Calendar,
-  Layers,
-  Eye
-} from 'lucide-react';
+  INCOME_SOURCES,
+  decorateIncome,
+  incomeShimActive,
+  removeMeta,
+  sourceLabel,
+  writeMeta,
+} from '../utils/income';
+import IncomeFormDialog from '../components/income/IncomeFormDialog';
+import {
+  Badge,
+  Button,
+  Card,
+  DataTable,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  EmptyState,
+  PageHeader,
+  SearchInput,
+  Select,
+  StatCard,
+} from '@/components/ui';
+
+const DATE_RANGES = [
+  { value: 'all', label: 'All time' },
+  { value: 'month', label: 'This month' },
+  { value: '30', label: 'Last 30 days' },
+  { value: '90', label: 'Last 90 days' },
+  { value: 'year', label: 'This year' },
+];
+
+const SORTS = [
+  { value: 'newest', label: 'Newest first' },
+  { value: 'oldest', label: 'Oldest first' },
+  { value: 'highest', label: 'Highest amount' },
+  { value: 'lowest', label: 'Lowest amount' },
+  { value: 'title', label: 'Title A–Z' },
+];
+
+const withinRange = (dateStr, range) => {
+  if (range === 'all') return true;
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return false;
+  const now = new Date();
+  if (range === 'month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  if (range === 'year') return d.getFullYear() === now.getFullYear();
+  const days = Number(range);
+  return (now - d) / 86400000 <= days;
+};
 
 const Income = () => {
   const { currency, dateFormat, numberFormat } = useFinancialPreferences();
-  const [incomes, setIncomes] = useState([]);
+
+  const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sourceFilter, setSourceFilter] = useState('');
-  const [sortOption, setSortOption] = useState('');
+  const [query, setQuery] = useState('');
+  const [source, setSource] = useState('all');
+  const [range, setRange] = useState('all');
+  const [sort, setSort] = useState('newest');
 
-  // Form & Modal States
-  const [formData, setFormData] = useState({ title: '', amount: '', currency: currency, source: 'salary', income_date: '', description: '' });
-  const [editingId, setEditingId] = useState(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [viewRecord, setViewRecord] = useState(null);
-  const [deleteId, setDeleteId] = useState(null);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    fetchIncomes();
-  }, [sourceFilter, sortOption]);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [deleting, setDeleting] = useState(null);
 
   const fetchIncomes = async () => {
     setLoading(true);
     try {
-      let url = '/incomes/';
-      const params = new URLSearchParams();
-      if (sourceFilter) params.append('source', sourceFilter);
-      if (sortOption) params.append('sort', sortOption);
-      if (params.toString()) url += `?${params.toString()}`;
-
-      const response = await api.get(url);
-      setIncomes(response.data);
+      const { data } = await api.get('/incomes/');
+      setRecords((Array.isArray(data) ? data : []).map(decorateIncome));
     } catch (err) {
       console.error('Error fetching income records:', err);
     } finally {
@@ -68,441 +95,352 @@ const Income = () => {
     }
   };
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
+  useEffect(() => {
+    fetchIncomes();
+  }, []);
 
-  const handleOpenAddModal = () => {
-    setEditingId(null);
-    setFormData({
-      title: '',
-      amount: '',
-      currency: currency,
-      source: 'salary',
-      income_date: new Date().toISOString().slice(0, 10),
-      description: ''
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const filtered = records.filter((r) => {
+      if (source !== 'all' && r.source !== source) return false;
+      if (!withinRange(r.date, range)) return false;
+      if (!q) return true;
+      return (
+        r.title.toLowerCase().includes(q) ||
+        r.notes.toLowerCase().includes(q) ||
+        sourceLabel(r.source).toLowerCase().includes(q)
+      );
     });
-    setError('');
-    setIsModalOpen(true);
-  };
 
-  const handleOpenEditModal = (inc) => {
-    setEditingId(inc.id);
-    setFormData({
-      title: inc.title,
-      amount: inc.amount,
-      currency: inc.currency || currency,
-      source: inc.source,
-      income_date: inc.income_date,
-      description: inc.description || ''
-    });
-    setError('');
-    setIsModalOpen(true);
-  };
-
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setEditingId(null);
-    setError('');
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    try {
-      if (editingId) {
-        await api.put(`/incomes/${editingId}/update/`, formData);
-      } else {
-        await api.post('/incomes/create/', formData);
+    const sorted = [...filtered];
+    sorted.sort((a, b) => {
+      switch (sort) {
+        case 'oldest':
+          return new Date(a.date) - new Date(b.date);
+        case 'highest':
+          return b.amountValue - a.amountValue;
+        case 'lowest':
+          return a.amountValue - b.amountValue;
+        case 'title':
+          return a.title.localeCompare(b.title);
+        default:
+          return new Date(b.date) - new Date(a.date);
       }
-      handleCloseModal();
-      fetchIncomes();
+    });
+    return sorted;
+  }, [records, query, source, range, sort]);
+
+  const stats = useMemo(() => {
+    const total = visible.reduce((sum, r) => sum + r.amountValue, 0);
+    const now = new Date();
+    const thisMonth = visible
+      .filter((r) => {
+        const d = new Date(r.date);
+        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      })
+      .reduce((sum, r) => sum + r.amountValue, 0);
+    const sources = new Set(visible.map((r) => r.source)).size;
+    return {
+      total,
+      thisMonth,
+      average: visible.length ? total / visible.length : 0,
+      sources,
+    };
+  }, [visible]);
+
+  const openAdd = () => {
+    setEditing(null);
+    setFormError('');
+    setDialogOpen(true);
+  };
+
+  const openEdit = (record) => {
+    setEditing(record);
+    setFormError('');
+    setDialogOpen(true);
+  };
+
+  const handleSubmit = async ({ payload, meta }) => {
+    setSubmitting(true);
+    setFormError('');
+    try {
+      if (editing) {
+        const { data } = await api.put(`/incomes/${editing.id}/update/`, payload);
+        if (meta) writeMeta(editing.id, meta);
+        setRecords((prev) => prev.map((r) => (r.id === editing.id ? decorateIncome(data) : r)));
+      } else {
+        const { data } = await api.post('/incomes/create/', payload);
+        if (meta) writeMeta(data.id, meta);
+        setRecords((prev) => [decorateIncome(data), ...prev]);
+      }
+      setDialogOpen(false);
+      setEditing(null);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to save income record.');
-      console.error(err);
+      const detail = err.response?.data;
+      setFormError(
+        typeof detail === 'string'
+          ? detail
+          : detail?.detail || Object.values(detail || {})[0]?.[0] || 'Could not save this income.',
+      );
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const handleConfirmDelete = async () => {
-    if (!deleteId) return;
+  const handleDelete = async () => {
+    if (!deleting) return;
     try {
-      await api.delete(`/incomes/${deleteId}/delete/`);
-      setDeleteId(null);
-      fetchIncomes();
+      await api.delete(`/incomes/${deleting.id}/delete/`);
+      removeMeta(deleting.id);
+      setRecords((prev) => prev.filter((r) => r.id !== deleting.id));
     } catch (err) {
       console.error('Error deleting income record:', err);
+    } finally {
+      setDeleting(null);
     }
   };
 
-  // Filter local incomes by search query
-  const filteredIncomes = incomes.filter((inc) => {
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      inc.title.toLowerCase().includes(q) ||
-      (inc.description && inc.description.toLowerCase().includes(q)) ||
-      (inc.source_display && inc.source_display.toLowerCase().includes(q))
-    );
-  });
+  const filtersActive = query || source !== 'all' || range !== 'all';
 
-  // Calculate summary metric statistics
-  const totalIncome = filteredIncomes.reduce((acc, curr) => acc + parseFloat(curr.amount || 0), 0);
-  const avgIncome = filteredIncomes.length > 0 ? totalIncome / filteredIncomes.length : 0;
-  const thisMonthIncome = filteredIncomes
-    .filter((inc) => new Date(inc.income_date).getMonth() === new Date().getMonth())
-    .reduce((acc, curr) => acc + parseFloat(curr.amount || 0), 0);
+  const columns = [
+    {
+      key: 'title',
+      header: 'Income',
+      cell: (row) => (
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium text-foreground">{row.title}</p>
+          {row.notes && <p className="mt-0.5 truncate text-xs text-muted-foreground">{row.notes}</p>}
+        </div>
+      ),
+    },
+    {
+      key: 'source',
+      header: 'Source',
+      cell: (row) => <Badge variant="success" icon={ArrowUpRight}>{sourceLabel(row.source)}</Badge>,
+    },
+    {
+      key: 'date',
+      header: 'Received',
+      cell: (row) => (
+        <span className="whitespace-nowrap text-xs text-muted-foreground">
+          {formatDate(row.date, dateFormat)}
+          {row.time && <span className="ml-1.5 font-mono">{row.time}</span>}
+        </span>
+      ),
+    },
+    {
+      key: 'amount',
+      header: 'Amount',
+      numeric: true,
+      cell: (row) => (
+        <span className="money whitespace-nowrap text-sm text-success">
+          +{formatCurrency(row.amountValue, row.currency || currency, numberFormat)}
+        </span>
+      ),
+    },
+    {
+      key: 'actions',
+      header: <span className="sr-only">Actions</span>,
+      numeric: true,
+      cell: (row) => (
+        <div className="flex justify-end gap-1">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label={`Edit ${row.title}`}
+            onClick={() => openEdit(row)}
+          >
+            <Pencil />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label={`Delete ${row.title}`}
+            className="hover:bg-destructive/10 hover:text-destructive"
+            onClick={() => setDeleting(row)}
+          >
+            <Trash2 />
+          </Button>
+        </div>
+      ),
+    },
+  ];
 
   return (
     <AppLayout title="Income">
-      {/* 1. Page Header */}
       <PageHeader
+        eyebrow="Money in"
         title="Income"
-        subtitle="Manage and monitor your income sources."
-        icon={TrendingUp}
+        description="Every rupee that arrived, where it came from, and when."
         actions={
-          <PrimaryButton onClick={handleOpenAddModal} icon={Plus}>
-            Add Income
-          </PrimaryButton>
+          <Button onClick={openAdd}>
+            <Plus /> Add income
+          </Button>
         }
       />
 
-      {/* 2. Summary Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <DashboardCard
-          title="Total Income Recorded"
-          amount={totalIncome}
-          currency={currency}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Total income"
+          value={formatCurrency(stats.total, currency, numberFormat)}
           icon={TrendingUp}
-          iconBg="bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
-          subtitle="Cumulative earnings"
-          subtitleColor="text-emerald-500"
+          tone="success"
+          hint={filtersActive ? 'Matching your filters' : 'All time'}
+          loading={loading}
         />
-
-        <DashboardCard
-          title="This Month Income"
-          amount={thisMonthIncome}
-          currency={currency}
-          icon={Calendar}
-          iconBg="bg-blue-500/10 text-blue-500 border-blue-500/20"
-          subtitle="Current calendar month"
-          subtitleColor="text-blue-500"
+        <StatCard
+          label="This month"
+          value={formatCurrency(stats.thisMonth, currency, numberFormat)}
+          icon={CalendarRange}
+          tone="info"
+          hint="Received since the 1st"
+          loading={loading}
         />
-
-        <DashboardCard
-          title="Average per Transaction"
-          amount={avgIncome}
-          currency={currency}
-          icon={DollarSign}
-          iconBg="bg-orange-500/10 text-orange-500 border-orange-500/20"
-          subtitle="Mean income stream value"
-          subtitleColor="text-orange-500"
+        <StatCard
+          label="Average entry"
+          value={formatCurrency(stats.average, currency, numberFormat)}
+          icon={Wallet}
+          tone="primary"
+          hint={`${visible.length} ${visible.length === 1 ? 'entry' : 'entries'}`}
+          loading={loading}
         />
-
-        <DashboardCard
-          title="Number of Streams"
-          amount={filteredIncomes.length}
-          currency={currency}
+        <StatCard
+          label="Active sources"
+          value={String(stats.sources)}
           icon={Layers}
-          iconBg="bg-amber-500/10 text-amber-500 border-amber-500/20"
-          subtitle="Total logged entries"
-          subtitleColor="text-amber-500"
+          tone="muted"
+          hint="Distinct income streams"
+          loading={loading}
         />
       </div>
 
-      {/* 3. Controls Action Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800/80 shadow-xs backdrop-blur-md">
-        <div className="w-full sm:w-72">
-          <SearchBar
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search income streams..."
-          />
+      {/* Controls */}
+      <Card className="flex flex-col gap-3 p-3 lg:flex-row lg:items-center">
+        <SearchInput
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onClear={() => setQuery('')}
+          placeholder="Search income by title, note or source…"
+          className="lg:max-w-sm lg:flex-1"
+        />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:ml-auto lg:w-auto">
+          <Select
+            value={range}
+            onChange={(e) => setRange(e.target.value)}
+            aria-label="Filter by date range"
+            className="sm:w-40"
+          >
+            {DATE_RANGES.map((r) => (
+              <option key={r.value} value={r.value}>
+                {r.label}
+              </option>
+            ))}
+          </Select>
+          <Select
+            value={source}
+            onChange={(e) => setSource(e.target.value)}
+            aria-label="Filter by source"
+            className="sm:w-44"
+          >
+            <option value="all">All sources</option>
+            {INCOME_SOURCES.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
+          </Select>
+          <Select
+            value={sort}
+            onChange={(e) => setSort(e.target.value)}
+            aria-label="Sort income"
+            className="sm:w-44"
+          >
+            {SORTS.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
+          </Select>
         </div>
+      </Card>
 
-        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-          <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
-            <Filter className="w-4 h-4 text-orange-500" />
-            <span>Source:</span>
-            <select
-              value={sourceFilter}
-              onChange={(e) => setSourceFilter(e.target.value)}
-              className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-200 focus:outline-none text-xs"
-            >
-              <option value="">All Sources</option>
-              <option value="salary">Salary/Wage</option>
-              <option value="freelance">Freelance/Consulting</option>
-              <option value="business">Business Revenue</option>
-              <option value="investments">Investments/Dividends</option>
-              <option value="other">Other Income</option>
-            </select>
-          </div>
-
-          <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
-            <ArrowUpDown className="w-4 h-4 text-orange-500" />
-            <span>Sort:</span>
-            <select
-              value={sortOption}
-              onChange={(e) => setSortOption(e.target.value)}
-              className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-200 focus:outline-none text-xs"
-            >
-              <option value="">Latest First</option>
-              <option value="oldest">Oldest First</option>
-              <option value="highest">Highest Amount</option>
-              <option value="lowest">Lowest Amount</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* 4. Income Records Table */}
-      {loading ? (
-        <LoadingSkeleton count={5} type="table" />
-      ) : filteredIncomes.length === 0 ? (
-        <TableContainer>
+      <DataTable
+        columns={columns}
+        rows={visible}
+        loading={loading}
+        caption="Income records"
+        empty={
           <EmptyState
-            title="No income streams found"
-            description={searchQuery || sourceFilter ? "No income streams match your current search or filter criteria." : "Click 'Add Income' above to log your first income stream."}
+            icon={TrendingUp}
+            title={filtersActive ? 'Nothing matches those filters' : 'No income logged yet'}
+            description={
+              filtersActive
+                ? 'Try a wider date range or clear the search.'
+                : 'Add your first payment and the summary above fills in.'
+            }
             action={
-              <PrimaryButton onClick={handleOpenAddModal} icon={Plus}>
-                Add First Income Stream
-              </PrimaryButton>
+              filtersActive ? (
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setQuery('');
+                    setSource('all');
+                    setRange('all');
+                  }}
+                >
+                  Clear filters
+                </Button>
+              ) : (
+                <Button onClick={openAdd}>
+                  <Plus /> Add income
+                </Button>
+              )
             }
           />
-        </TableContainer>
-      ) : (
-        <TableContainer>
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                <th className="py-3 px-4">Title</th>
-                <th className="py-3 px-4">Source</th>
-                <th className="py-3 px-4">Date</th>
-                <th className="py-3 px-4">Amount</th>
-                <th className="py-3 px-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-              {filteredIncomes.map((inc) => (
-                <tr key={inc.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition">
-                  <td className="py-3.5 px-4 font-semibold text-slate-900 dark:text-slate-100">
-                    {inc.title}
-                    {inc.description && <p className="text-xs font-normal text-slate-500 dark:text-slate-400 mt-0.5">{inc.description}</p>}
-                  </td>
-                  <td className="py-3.5 px-4">
-                    <StatusBadge type="income">
-                      {inc.source_display || inc.source}
-                    </StatusBadge>
-                  </td>
-                  <td className="py-3.5 px-4 text-xs text-slate-500 dark:text-slate-400">
-                    {formatDate(inc.income_date, dateFormat)}
-                  </td>
-                  <td className="py-3.5 px-4 font-bold text-emerald-500">
-                    +{formatCurrency(inc.amount, inc.currency || currency, numberFormat)}
-                  </td>
-                  <td className="py-3.5 px-4 text-right">
-                    <div className="flex items-center justify-end gap-1.5">
-                      <button
-                        onClick={() => setViewRecord(inc)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-blue-500 hover:bg-blue-500/10 transition cursor-pointer"
-                        title="View Income Details"
-                        aria-label="View Income Details"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleOpenEditModal(inc)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-orange-500 hover:bg-orange-500/10 transition cursor-pointer"
-                        title="Edit Income Record"
-                        aria-label="Edit Income Record"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => setDeleteId(inc.id)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition cursor-pointer"
-                        title="Delete Income Record"
-                        aria-label="Delete Income Record"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </TableContainer>
-      )}
-
-      {/* 5. Edit / Add Income Modal Dialog */}
-      <Modal
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        title={editingId ? 'Edit Income Entry' : 'Log New Income Stream'}
-        maxWidth="max-w-lg"
-      >
-        {error && (
-          <div className="mb-4 p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-500 text-xs flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Title *</label>
-            <input
-              type="text"
-              name="title"
-              placeholder="e.g. Monthly Salary, Client Web Development Retainer"
-              value={formData.title}
-              onChange={handleChange}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-orange-500"
-              required
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="sm:col-span-2">
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Amount *</label>
-              <input
-                type="number"
-                step="0.01"
-                name="amount"
-                placeholder="4500.00"
-                value={formData.amount}
-                onChange={handleChange}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-orange-500"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Currency</label>
-              <select
-                name="currency"
-                value={formData.currency}
-                onChange={handleChange}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-orange-500"
-              >
-                {SUPPORTED_CURRENCIES.map((c) => (
-                  <option key={c.code} value={c.code}>
-                    {c.code} ({c.symbol})
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Income Source *</label>
-              <select
-                name="source"
-                value={formData.source}
-                onChange={handleChange}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-orange-500"
-              >
-                <option value="salary">Salary/Wage</option>
-                <option value="freelance">Freelance/Consulting</option>
-                <option value="business">Business Revenue</option>
-                <option value="investments">Investments/Dividends</option>
-                <option value="other">Other Income</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Income Date *</label>
-              <input
-                type="date"
-                name="income_date"
-                value={formData.income_date}
-                onChange={handleChange}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-orange-500"
-                required
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Description (Optional)</label>
-            <textarea
-              name="description"
-              placeholder="Additional income notes or reference details..."
-              rows="2"
-              value={formData.description}
-              onChange={handleChange}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-orange-500"
-            />
-          </div>
-
-          <div className="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
-            <SecondaryButton onClick={handleCloseModal}>Cancel</SecondaryButton>
-            <PrimaryButton type="submit">
-              {editingId ? 'Update Income' : 'Save Income'}
-            </PrimaryButton>
-          </div>
-        </form>
-      </Modal>
-
-      {/* 6. View Income Details Modal */}
-      <Modal
-        isOpen={Boolean(viewRecord)}
-        onClose={() => setViewRecord(null)}
-        title="Income Record Details"
-        maxWidth="max-w-md"
-      >
-        {viewRecord && (
-          <div className="space-y-4">
-            <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">
-              <div className="text-xs font-semibold text-emerald-500 uppercase tracking-wider mb-1">Income Amount</div>
-              <div className="text-2xl font-extrabold text-emerald-500">
-                +{formatCurrency(viewRecord.amount, viewRecord.currency || currency, numberFormat)}
-              </div>
-            </div>
-
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between py-2 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-slate-500 dark:text-slate-400 font-medium">Title</span>
-                <span className="font-semibold text-slate-900 dark:text-slate-100">{viewRecord.title}</span>
-              </div>
-              <div className="flex justify-between py-2 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-slate-500 dark:text-slate-400 font-medium">Source</span>
-                <StatusBadge type="income">
-                  {viewRecord.source_display || viewRecord.source}
-                </StatusBadge>
-              </div>
-              <div className="flex justify-between py-2 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-slate-500 dark:text-slate-400 font-medium">Income Date</span>
-                <span className="font-semibold text-slate-900 dark:text-slate-100">{formatDate(viewRecord.income_date, dateFormat)}</span>
-              </div>
-              {viewRecord.description && (
-                <div className="py-2">
-                  <span className="block text-slate-500 dark:text-slate-400 font-medium mb-1">Description</span>
-                  <p className="p-3 rounded-xl bg-slate-100 dark:bg-slate-950 text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
-                    {viewRecord.description}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            <div className="flex justify-end pt-3 border-t border-slate-100 dark:border-slate-800">
-              <SecondaryButton onClick={() => setViewRecord(null)}>Close</SecondaryButton>
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      {/* 7. Delete Confirmation Dialog */}
-      <ConfirmationDialog
-        isOpen={Boolean(deleteId)}
-        onClose={() => setDeleteId(null)}
-        onConfirm={handleConfirmDelete}
-        title="Delete Income Record"
-        message="Are you sure you want to delete this income stream record? This operation cannot be reversed."
-        confirmText="Delete Record"
-        isDanger={true}
+        }
       />
+
+      {/* Mobile quick action */}
+      <button
+        onClick={openAdd}
+        aria-label="Add income"
+        className="fixed bottom-6 right-5 z-30 grid size-14 place-items-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] active:translate-y-px sm:hidden"
+      >
+        <Plus className="size-5" />
+      </button>
+
+      <IncomeFormDialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) setEditing(null);
+        }}
+        onSubmit={handleSubmit}
+        record={editing}
+        defaultCurrency={currency}
+        shimActive={incomeShimActive()}
+        submitting={submitting}
+        error={formError}
+      />
+
+      <Dialog open={Boolean(deleting)} onOpenChange={(open) => !open && setDeleting(null)}>
+        <DialogContent size="sm">
+          <DialogHeader>
+            <DialogTitle>Delete this income?</DialogTitle>
+            <DialogDescription>
+              “{deleting?.title}” will be removed permanently. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDeleting(null)}>
+              Keep it
+            </Button>
+            <Button variant="destructive" onClick={handleDelete}>
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 };
