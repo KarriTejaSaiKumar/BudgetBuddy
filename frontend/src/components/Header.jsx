@@ -15,6 +15,7 @@ import {
   PiggyBank,
   BarChart2,
   User,
+  Sparkles,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useFinancialPreferences } from '../context/FinancialPreferencesContext';
@@ -48,7 +49,7 @@ const destinations = [
  * Top chrome: quick-jump search, notifications, theme, account.
  * Frosted and hairline-edged so it dissolves into the canvas when scrolling.
  */
-const Header = ({ title = 'Dashboard', setMobileOpen }) => {
+const Header = ({ title = 'Dashboard', setMobileOpen, setAssistantOpen }) => {
   const { user, logout } = useAuth();
   const { currency } = useFinancialPreferences();
   const {
@@ -193,6 +194,15 @@ const Header = ({ title = 'Dashboard', setMobileOpen }) => {
           </button>
 
           <ThemeToggle />
+
+          <button
+            onClick={() => setAssistantOpen?.(true)}
+            title="AI Voice Assistant"
+            aria-label="Open AI Voice Assistant"
+            className="grid size-9 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <Sparkles className="size-4.5" />
+          </button>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

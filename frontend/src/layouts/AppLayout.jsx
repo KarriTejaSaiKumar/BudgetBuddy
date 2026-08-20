@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import QuickActionsFab from '../components/QuickActionsFab';
+import AssistantDrawer from '../components/AssistantDrawer';
 
 const COLLAPSE_KEY = 'budgetbuddy_sidebar_collapsed';
 
@@ -15,6 +16,7 @@ const AppLayout = ({ children, title = 'Dashboard' }) => {
     return localStorage.getItem(COLLAPSE_KEY) === 'true';
   });
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
 
   useEffect(() => {
     localStorage.setItem(COLLAPSE_KEY, String(collapsed));
@@ -34,7 +36,7 @@ const AppLayout = ({ children, title = 'Dashboard' }) => {
       />
 
       <div className="flex min-h-screen min-w-0 flex-1 flex-col overflow-x-hidden">
-        <Header title={title} setMobileOpen={setMobileOpen} />
+        <Header title={title} setMobileOpen={setMobileOpen} setAssistantOpen={setAssistantOpen} />
 
         <main
           id="main"
@@ -45,6 +47,7 @@ const AppLayout = ({ children, title = 'Dashboard' }) => {
       </div>
 
       <QuickActionsFab />
+      <AssistantDrawer isOpen={assistantOpen} onClose={() => setAssistantOpen(false)} />
     </div>
   );
 };

@@ -45,6 +45,9 @@ urlpatterns = [
     # Reports API endpoints
     path('api/reports/', include('reports.urls')),
     
+    # Chat Assistant API endpoints
+    path('api/chat/', include('chat.urls')),
+    
     # SimpleJWT Authentication endpoints (Login, Refresh)
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),

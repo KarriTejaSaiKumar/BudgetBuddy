@@ -73,6 +73,7 @@
 }
 
 :root {
+  color-scheme: light;
   /* Light mode: cool porcelain, not flat white. */
   --background: oklch(0.978 0.003 264);
   --foreground: oklch(0.21 0.02 265);
@@ -131,6 +132,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   /* Dark mode is the primary experience: deep blue-black, never pure #000. */
   --background: oklch(0.165 0.013 268);
   --foreground: oklch(0.972 0.004 264);
@@ -207,6 +209,35 @@
     transition:
       background-color 0.2s var(--ease-out-soft),
       color 0.2s var(--ease-out-soft);
+  }
+
+  select {
+    color-scheme: light;
+  }
+
+  .dark select {
+    color-scheme: dark;
+  }
+
+  select option,
+  select optgroup {
+    background-color: var(--color-surface);
+    color: var(--color-foreground);
+  }
+
+  .dark select option,
+  .dark select optgroup {
+    background-color: var(--color-surface);
+    color: var(--color-foreground);
+  }
+
+  select option:checked {
+    background-color: var(--color-accent);
+    color: var(--color-accent-foreground);
+  }
+
+  select option:disabled {
+    color: var(--color-muted-foreground);
   }
 
   ::selection {

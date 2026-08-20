@@ -15,7 +15,7 @@ const DropdownMenuContent = React.forwardRef(function Content({ className, sideO
         ref={ref}
         sideOffset={sideOffset}
         className={cn(
-          "z-50 min-w-48 overflow-hidden rounded-2xl bg-popover p-1.5 text-popover-foreground shadow-[0_0_0_1px_var(--color-hairline),var(--shadow-lg)]",
+          "z-50 min-w-48 overflow-hidden rounded-2xl border border-border/80 bg-popover p-1.5 text-popover-foreground shadow-lg backdrop-blur-md",
           "data-[state=open]:animate-in data-[state=open]:fade-in data-[state=open]:zoom-in-95",
           className,
         )}
@@ -30,10 +30,10 @@ const DropdownMenuItem = React.forwardRef(function Item({ className, destructive
     <DropdownMenuPrimitive.Item
       ref={ref}
       className={cn(
-        "relative flex cursor-pointer select-none items-center gap-2 rounded-xl px-2.5 py-2 text-sm outline-none transition-colors",
-        "focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        "relative flex cursor-pointer select-none items-center gap-2 rounded-xl px-2.5 py-2 text-sm text-popover-foreground font-medium outline-none transition-colors",
+        "hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         "[&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-muted-foreground",
-        destructive && "text-destructive focus:bg-destructive/10 focus:text-destructive [&_svg]:text-destructive",
+        destructive && "text-destructive hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive [&_svg]:text-destructive",
         className,
       )}
       {...props}

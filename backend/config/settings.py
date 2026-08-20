@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     'savings.apps.SavingsConfig',
     'notifications.apps.NotificationsConfig',
     'analytics.apps.AnalyticsConfig',
+    'chat',
 ]
 
 MIDDLEWARE = [
