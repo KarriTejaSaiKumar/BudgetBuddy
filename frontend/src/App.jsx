@@ -25,7 +25,7 @@ function App() {
     <ThemeProvider>
       <FinancialPreferencesProvider>
         <AuthProvider>
-          <Router>
+          <Router basename="/BudgetBuddy">
             <div className="App">
               <Routes>
                 {/* Public Routes */}
